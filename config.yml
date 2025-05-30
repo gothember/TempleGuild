@@ -66,6 +66,42 @@ messages:
   clan_storage_title: ["&2Clan Storage: &a{clan_name}"]
   clan_storage_saved: ["&aClan storage saved."]
 
+  clan_leave_success:
+    - "&aYou have successfully left clan &e{clan_name}&a."
+  clan_leave_leader_last_member_disband:
+    - "&eYou were the last member of &6{clan_name}&e. The clan has been disbanded."
+  clan_leave_leader_must_disband_or_transfer:
+    - "&cAs the clan leader, you cannot leave &e{clan_name}&c yet."
+    - "&cYou must either disband the clan (/clan disband) or transfer leadership (feature pending)."
+  clan_member_left_notification: # Sent to other clan members
+    - "&e{player_name} has left the clan."
+
+  clan_not_found_for_disband:
+    - "&cClan &e{clan_name}&c not found."
+  clan_disband_success:
+    - "&aClan &e{clan_name}&a has been successfully disbanded."
+  clan_disbanded_notification_members:
+    - "&cYour clan, &e{clan_name}&c, has been disbanded by the leader or system."
+
+  clan_kick_usage:
+    - "&cUsage: /clan kick <player>"
+  clan_kick_no_leader_permission:
+    - "&cOnly the clan leader can kick members."
+  player_not_online_to_kick:
+    - "&cPlayer {player_name} is not online to be kicked."
+  clan_kick_cannot_kick_self:
+    - "&cYou cannot kick yourself from the clan. Use /clan leave instead."
+  clan_kick_target_not_in_your_clan:
+    - "&cPlayer {target_player_name} is not a member of your clan."
+  clan_kick_cannot_kick_leader:
+    - "&cYou cannot kick the clan leader."
+  clan_kick_success_kicker:
+    - "&aYou have successfully kicked {target_player_name} from clan {clan_name}."
+  clan_kick_notification_kicked_player:
+    - "&cYou have been kicked from clan {clan_name} by {kicker_name}."
+  clan_kick_notification_members:
+    - "&e{target_player_name} has been kicked from the clan by {kicker_name}."
+
   # Help System Messages
   clan_help_header: ["&e--- TempleGuild Clan Help ---"]
   clan_help_footer: ["&e--- Type /clan help <command> for more info ---"]
@@ -107,6 +143,14 @@ messages:
       arguments: "[command]"
       description: "Shows this help message or help for a specific command."
       permission: ""
+      leave: # New entry
+        arguments: "" # No arguments
+        description: "Leave your current clan."
+        permission: "templeguild.clan.leave"
+      kick: # New entry
+        arguments: "<player>"
+        description: "Kicks a player from your clan (leader only)."
+        permission: "templeguild.clan.kick"
 
 
 # Console / System Messages (already converted to lists)
@@ -134,7 +178,14 @@ log_saving_all_inventories: ["Saving all loaded clan inventories..."]
 log_inventories_saving_complete: ["Clan inventories saving complete."]
 
 clan_storage:
-  default_size: 27
+  default_size: 27 # Must be multiple of 9, max 54. (e.g., 9, 18, 27, 36, 45, 54)
+  fill_new_storage_with_filler_item: false # Set to true to enable
+  filler_item:
+    material: "GRAY_STAINED_GLASS_PANE"
+    name: "&7 " # A space or some other non-functional name
+    lore:
+      - "&7This slot is decorative."
+      # - "&7More lore lines if needed."
 
 placeholderapi:
   no_clan_name: ["No Clan"]

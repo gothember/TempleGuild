@@ -148,11 +148,19 @@ public class SqliteStorage implements DataStorage {
 
     @Override
     public void deleteClan(String clanName) {
-        // Players table has ON DELETE SET NULL for clan_name, so members will be disassociated automatically.
+        // Important: Clear cache for all members BEFORE deleting the clan record,
+        // as we need to know who the members were.
+        Set<UUID> members = getClanMembers(clanName); // Get members before they are disassociated by DB or clan deletion
+        for (UUID memberUUID : members) {
+            plugin.getClanManager().clearPlayerClanCache(memberUUID);
+            plugin.getClanManager().removeFromClanChatToggleOnLeave(memberUUID); // Also ensure chat toggle is off
+        }
+
         String sql = "DELETE FROM clans WHERE clan_name = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, clanName.toLowerCase());
             pstmt.executeUpdate();
+            // Player disassociation is handled by ON DELETE SET NULL/CASCADE in players table schema
         } catch (SQLException e) {
             plugin.getLogger().log(Level.SEVERE, "Could not delete clan: " + clanName, e);
         }

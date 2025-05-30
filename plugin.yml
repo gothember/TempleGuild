@@ -32,4 +32,10 @@ permissions:
   templeguild.clan.storage.access:
     description: Allows opening and using the clan storage.
     default: true # Or op, or based on clan rank later
+  templeguild.clan.leave:
+    description: Allows a player to leave their current clan.
+    default: true
+  templeguild.clan.kick:
+    description: Allows a clan leader (or authorized role) to kick a member.
+    default: op # Or just 'op' if only leaders via logic for now
   # Add more permissions as commands are implemented

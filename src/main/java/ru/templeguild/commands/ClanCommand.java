@@ -185,6 +185,56 @@ public class ClanCommand implements CommandExecutor, TabCompleter {
             Inventory clanInv = clanManager.getClanInventory(playerClan);
             player.openInventory(clanInv);
             return true;
+        } else if (subCommand.equals("leave")) {
+            if (!player.hasPermission("templeguild.clan.leave")) {
+                ChatUtils.sendMessages(player, plugin, "messages.no_permission");
+                return true;
+            }
+            clanManager.playerLeaveClan(player); // All logic and messages handled by ClanManager
+            return true;
+        } else if (subCommand.equals("kick")) {
+            if (!player.hasPermission("templeguild.clan.kick")) {
+                ChatUtils.sendMessages(player, plugin, "messages.no_permission");
+                return true;
+            }
+
+            Clan clan = clanManager.getClanByPlayer(player.getUniqueId());
+            if (clan == null) {
+                ChatUtils.sendMessages(player, plugin, "messages.not_in_clan");
+                return true;
+            }
+
+            // Permission: Only leader can kick (for now)
+            if (!clan.getLeader().equals(player.getUniqueId())) {
+                ChatUtils.sendMessages(player, plugin, "messages.clan_kick_no_leader_permission");
+                return true;
+            }
+
+            if (args.length < 2) {
+                ChatUtils.sendMessages(player, plugin, "messages.clan_kick_usage");
+                return true;
+            }
+
+            Player targetToKick = Bukkit.getPlayerExact(args[1]);
+            if (targetToKick == null) { // Check if player is online by Bukkit.getPlayerExact
+                ChatUtils.sendMessages(player, plugin, "messages.player_not_online_to_kick", "{player_name}", args[1]);
+                return true;
+            }
+
+            if (targetToKick.equals(player)) {
+                ChatUtils.sendMessages(player, plugin, "messages.clan_kick_cannot_kick_self");
+                return true;
+            }
+
+            Clan targetClan = clanManager.getClanByPlayer(targetToKick.getUniqueId());
+            if (targetClan == null || !targetClan.getName().equalsIgnoreCase(clan.getName())) {
+                ChatUtils.sendMessages(player, plugin, "messages.clan_kick_target_not_in_your_clan", "{target_player_name}", targetToKick.getName());
+                return true;
+            }
+
+            clanManager.kickPlayerFromClan(player, targetToKick, clan);
+
+            return true;
         }
 
         ChatUtils.sendMessages(player, plugin, "messages.unknown_subcommand", "{command}", subCommand);
@@ -229,7 +279,7 @@ public class ClanCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> subcommands = Arrays.asList("create", "invite", "accept", "decline", "chat", "pvp", "storage", "help" /*, help, leave, disband, etc. */);
+            List<String> subcommands = Arrays.asList("create", "invite", "accept", "decline", "chat", "pvp", "storage", "help", "leave", "kick" /*, disband, etc. */);
             return subcommands.stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());
@@ -242,18 +292,13 @@ public class ClanCommand implements CommandExecutor, TabCompleter {
                         .filter(name -> name.toLowerCase().startsWith(args[1].toLowerCase()))
                         .collect(Collectors.toList());
             } else if (args.length == 2 && (args[0].equalsIgnoreCase("accept") || args[0].equalsIgnoreCase("decline"))) {
-                // Suggest clan names from pending invites for the player
-                // This requires ClanManager to expose a method to get pending invite names for a player
-                // For now, simple placeholder:
-                // List<String> pendingInviteClanNames = clanManager.getPendingInviteClanNamesForPlayer(((Player) sender).getUniqueId());
-                // if (pendingInviteClanNames != null && !pendingInviteClanNames.isEmpty()) {
-                //    return pendingInviteClanNames.stream()
-                //            .filter(name -> name.toLowerCase().startsWith(args[1].toLowerCase()))
-                //            .collect(Collectors.toList());
-                // }
-            return Arrays.asList("<clan_name>");
-        }
-        // Add more tab completions for other commands later
+                return Arrays.asList("<clan_name>");
+            } else if (args.length == 2 && args[0].equalsIgnoreCase("kick")) {
+                return Bukkit.getOnlinePlayers().stream()
+                        .map(Player::getName)
+                        .filter(name -> name.toLowerCase().startsWith(args[1].toLowerCase()))
+                        .collect(Collectors.toList());
+            }
         return new ArrayList<>();
     }
 }

@@ -6,6 +6,9 @@ import org.bukkit.entity.Player; // Added import for Player
 import org.bukkit.Bukkit; // Added for Bukkit.getPlayer
 import ru.templeguild.utils.ChatUtils; // Added for ChatUtils
 import org.bukkit.inventory.Inventory; // Added for Inventory
+import org.bukkit.inventory.ItemStack; // Added for ItemStack
+import org.bukkit.inventory.meta.ItemMeta; // Added for ItemMeta
+import org.bukkit.Material; // Added for Material
 import ru.templeguild.utils.InventoryUtils; // Our new utility
 import net.md_5.bungee.api.chat.TextComponent;
 import net.md_5.bungee.api.chat.ClickEvent;
@@ -135,6 +138,149 @@ public class ClanManager {
         }
         clanInventories.remove(clanName.toLowerCase());
         plugin.getLogger().info("Clan '" + clanName + "' deleted."); // Dynamic, keep as is for now
+    }
+
+    /**
+     * Internal method to handle removing a player from a clan.
+     * Updates clan object, data storage, caches, and chat toggle.
+     * Does NOT handle disbanding if leader leaves or is last member - that's for the caller to decide.
+     *
+     * @param playerUUID The UUID of the player to remove.
+     * @param clan The clan from which the player is to be removed.
+     */
+    private void removePlayerFromClanInternal(UUID playerUUID, Clan clan) {
+        if (clan == null || !clan.isMember(playerUUID)) {
+            plugin.getLogger().warning("Attempted to remove player " + playerUUID + " from clan " + (clan != null ? clan.getName() : "null") + " but they are not a member or clan is null.");
+            return;
+        }
+
+        String clanName = clan.getName();
+
+        clan.removeMember(playerUUID);
+        dataStorage.removePlayerFromClan(playerUUID);
+
+        plugin.getLogger().info("Player " + playerUUID + " removed from clan " + clanName);
+    }
+
+    // This method is for when a player chooses to leave.
+    public void playerLeaveClan(Player player) {
+        Clan clan = getClanByPlayer(player.getUniqueId());
+        if (clan == null) {
+            ChatUtils.sendMessages(player, plugin, "messages.not_in_clan");
+            return;
+        }
+
+        UUID playerUUID = player.getUniqueId();
+
+        if (clan.getLeader().equals(playerUUID)) {
+            if (clan.getMembers().size() == 1) {
+                ChatUtils.sendMessages(player, plugin, "messages.clan_leave_leader_last_member_disband", "{clan_name}", clan.getName());
+                disbandClan(clan.getName(), player);
+                return;
+            } else {
+                ChatUtils.sendMessages(player, plugin, "messages.clan_leave_leader_must_disband_or_transfer", "{clan_name}", clan.getName());
+                return;
+            }
+        }
+
+        removePlayerFromClanInternal(playerUUID, clan);
+
+        ChatUtils.sendMessages(player, plugin, "messages.clan_leave_success", "{clan_name}", clan.getName());
+
+        String leftMessage = ChatUtils.getFormattedString(plugin, "messages.clan_member_left_notification",
+                "{player_name}", player.getName(),
+                "{clan_name}", clan.getName()
+        );
+        clan.getMembers().stream()
+            .map(Bukkit::getPlayer)
+            .filter(java.util.Objects::nonNull)
+            .forEach(member -> member.sendMessage(leftMessage));
+    }
+
+    public void disbandClan(String clanName, CommandSender initiator) {
+        Clan clan = getClan(clanName);
+        if (clan == null) {
+            if (initiator != null) {
+                 ChatUtils.sendMessages(initiator, plugin, "messages.clan_not_found_for_disband", "{clan_name}", clanName);
+            } else {
+                plugin.getLogger().warning("Attempted to disband non-existent clan: " + clanName);
+            }
+            return;
+        }
+
+        plugin.getLogger().info("Disbanding clan: " + clan.getName() + (initiator != null ? " by " + initiator.getName() : ""));
+
+        List<UUID> membersToNotify = new ArrayList<>(clan.getMembers());
+        String disbandedMessage = ChatUtils.getFormattedString(plugin, "messages.clan_disbanded_notification_members", "{clan_name}", clan.getName());
+        for (UUID memberUUID : membersToNotify) {
+            Player memberPlayer = Bukkit.getPlayer(memberUUID);
+            if (memberPlayer != null && memberPlayer.isOnline()) {
+                memberPlayer.sendMessage(disbandedMessage);
+            }
+        }
+
+        for (UUID memberUUID : new ArrayList<>(clan.getMembers())) {
+            removePlayerFromClanInternal(memberUUID, clan);
+        }
+
+        if (clanInventories.containsKey(clan.getName().toLowerCase())) {
+            clan.setSerializedStorage(null);
+            clanInventories.remove(clan.getName().toLowerCase());
+            plugin.getLogger().info("Removed in-memory storage for disbanded clan: " + clan.getName());
+        }
+
+        dataStorage.deleteClan(clan.getName());
+        clansMap.remove(clan.getName().toLowerCase());
+
+
+        if (initiator != null) {
+            ChatUtils.sendMessages(initiator, plugin, "messages.clan_disband_success", "{clan_name}", clan.getName());
+        }
+        plugin.getLogger().info("Clan " + clan.getName() + " disbanded successfully.");
+    }
+
+    public void kickPlayerFromClan(Player kicker, Player targetToKick, Clan clan) {
+        // Double check conditions, though command should pre-validate most
+        if (!clan.getLeader().equals(kicker.getUniqueId())) {
+            ChatUtils.sendMessages(kicker, plugin, "messages.clan_kick_no_leader_permission"); // Should be caught by command too
+            return;
+        }
+        if (targetToKick.getUniqueId().equals(kicker.getUniqueId())) {
+            ChatUtils.sendMessages(kicker, plugin, "messages.clan_kick_cannot_kick_self"); // Should be caught by command
+            return;
+        }
+        if (!clan.isMember(targetToKick.getUniqueId())) {
+            ChatUtils.sendMessages(kicker, plugin, "messages.clan_kick_target_not_in_your_clan", "{target_player_name}", targetToKick.getName()); // Should be caught by command
+            return;
+        }
+        if (targetToKick.getUniqueId().equals(clan.getLeader())) {
+            // This case should technically not happen if kicker is leader and target is leader (means target == kicker)
+            // But as a safeguard if officer roles are added later and can kick members but not leader.
+            ChatUtils.sendMessages(kicker, plugin, "messages.clan_kick_cannot_kick_leader");
+            return;
+        }
+
+
+        // Perform the removal
+        removePlayerFromClanInternal(targetToKick.getUniqueId(), clan);
+
+        // Send confirmation to kicker
+        ChatUtils.sendMessages(kicker, plugin, "messages.clan_kick_success_kicker", "{target_player_name}", targetToKick.getName(), "{clan_name}", clan.getName());
+
+        // Send notification to the kicked player
+        if (targetToKick.isOnline()) { // Check if still online
+            ChatUtils.sendMessages(targetToKick, plugin, "messages.clan_kick_notification_kicked_player", "{clan_name}", clan.getName(), "{kicker_name}", kicker.getName());
+        }
+
+        // Notify other clan members
+        String kickNotificationMessage = ChatUtils.getFormattedString(plugin, "messages.clan_kick_notification_members",
+                "{target_player_name}", targetToKick.getName(),
+                "{kicker_name}", kicker.getName()
+        );
+        clan.getMembers().stream() // targetToKick is already removed from clan.getMembers()
+            .map(Bukkit::getPlayer)
+            .filter(java.util.Objects::nonNull)
+            .forEach(member -> member.sendMessage(kickNotificationMessage));
     }
 
     public void addPlayerToClan(Player player, Clan clan) {
@@ -424,12 +570,67 @@ public class ClanManager {
         if (clanInventories.containsKey(clanNameLower)) {
             return clanInventories.get(clanNameLower);
         } else {
+            // Try to load from clan's serialized data first if it exists but isn't in memory map yet
+            // This case should ideally be covered by loadClans(), but as a safeguard:
+            if (clan.getSerializedStorage() != null && !clan.getSerializedStorage().isEmpty()) {
+                try {
+                    String inventoryTitle = ChatUtils.getFormattedString(plugin, "messages.clan_storage_title", "{clan_name}", clan.getName());
+                    Inventory inv = InventoryUtils.base64ToInventory(clan.getSerializedStorage(), inventoryTitle);
+                    clanInventories.put(clanNameLower, inv); // Cache it
+                    return inv;
+                } catch (IOException e) {
+                    plugin.getLogger().log(Level.SEVERE, "Could not deserialize inventory for clan " + clan.getName() + " during getClanInventory. Creating new.", e);
+                    // Fall through to create a new one if deserialization fails
+                }
+            }
+
+            // Create a new inventory
             int size = plugin.getConfig().getInt("clan_storage.default_size", 27);
-            if (size % 9 != 0 || size > 54) size = 27;
+            if (size % 9 != 0 || size <= 0 || size > 54) { // Ensure size is valid (multiple of 9, positive, not > 54)
+                plugin.getLogger().warning("Invalid clan_storage.default_size: " + size + ". Defaulting to 27.");
+                size = 27;
+            }
 
             String inventoryTitle = ChatUtils.getFormattedString(plugin, "messages.clan_storage_title", "{clan_name}", clan.getName());
-            Inventory inv = Bukkit.createInventory(null, size, inventoryTitle); // Title is already formatted
+            Inventory inv = Bukkit.createInventory(null, size, inventoryTitle);
+
+            // Check if we should fill the new inventory with a filler item
+            if (plugin.getConfig().getBoolean("clan_storage.fill_new_storage_with_filler_item", false)) {
+                String materialName = plugin.getConfig().getString("clan_storage.filler_item.material", "GRAY_STAINED_GLASS_PANE");
+                Material fillerMaterial = Material.matchMaterial(materialName);
+                if (fillerMaterial == null) {
+                    plugin.getLogger().warning("Invalid material specified for clan_storage.filler_item.material: " + materialName + ". Using GRAY_STAINED_GLASS_PANE as fallback.");
+                    fillerMaterial = Material.GRAY_STAINED_GLASS_PANE;
+                }
+
+                ItemStack fillerItem = new ItemStack(fillerMaterial);
+                ItemMeta meta = fillerItem.getItemMeta();
+
+                if (meta != null) {
+                    String itemName = plugin.getConfig().getString("clan_storage.filler_item.name");
+                    if (itemName != null && !itemName.isEmpty()) {
+                        meta.setDisplayName(ChatUtils.format(itemName));
+                    }
+
+                    List<String> loreLines = plugin.getConfig().getStringList("clan_storage.filler_item.lore");
+                    if (loreLines != null && !loreLines.isEmpty()) {
+                        List<String> formattedLore = new ArrayList<>();
+                        for (String line : loreLines) {
+                            formattedLore.add(ChatUtils.format(line));
+                        }
+                        meta.setLore(formattedLore);
+                    }
+                    fillerItem.setItemMeta(meta);
+                }
+
+                for (int i = 0; i < inv.getSize(); i++) {
+                    inv.setItem(i, fillerItem.clone());
+                }
+            }
+
             clanInventories.put(clanNameLower, inv);
+            saveClanInventory(clan); // Save the newly created (and possibly filled) inventory
+
             return inv;
         }
     }
