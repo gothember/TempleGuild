@@ -30,19 +30,14 @@ public class PlayerInventoryCloseListener implements Listener { // Renamed for c
         if (playerClan == null) return; // Not in a clan, or left while storage was open
 
         // Check if the closed inventory is a clan storage
-        // This comparison is a bit fragile if titles change dynamically beyond clan name.
-        // A more robust way would be to tag inventories or check instance if inventories are unique.
-        String expectedTitle = ChatUtils.format(plugin.getConfig().getString("messages.clan_storage_title", "&8Clan Storage: {clan_name}")
-                                            .replace("{clan_name}", playerClan.getName()));
-        String actualTitle = ChatUtils.format(event.getView().getTitle()); // event.getView().getTitle() is better
+        String expectedTitle = ChatUtils.getFormattedString(plugin, "messages.clan_storage_title", "{clan_name}", playerClan.getName());
+        String actualTitle = event.getView().getTitle(); // Title from event is already formatted if it was set with formatted string
 
-        if (actualTitle.equals(expectedTitle)) { // Check title first for performance
-             // Check if this inventory instance is the one managed by ClanManager
-             // This is a direct object comparison, safer.
+        if (actualTitle.equals(expectedTitle)) {
              Inventory managedInv = clanManager.getClanInventory(playerClan);
-             if (closedInventory == managedInv) { // Ensure it's the exact same inventory object
+             if (closedInventory == managedInv) {
                 clanManager.saveClanInventory(playerClan);
-                player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.clan_storage_saved", "&aClan storage saved.")));
+                ChatUtils.sendMessages(player, plugin, "messages.clan_storage_saved");
              }
         }
     }

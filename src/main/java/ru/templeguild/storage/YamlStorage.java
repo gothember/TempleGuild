@@ -41,14 +41,14 @@ public class YamlStorage implements DataStorage {
         }
         playersConfig = YamlConfiguration.loadConfiguration(playersFile);
 
-        plugin.getLogger().info("YAML storage initialized.");
+        plugin.getLogger().info(plugin.getConfig().getString("messages.yaml_storage_initialized", "YAML storage initialized."));
     }
 
     @Override
     public void shutdown() {
         saveClans();
         savePlayers();
-        plugin.getLogger().info("YAML storage shutdown complete. Data saved.");
+        plugin.getLogger().info(plugin.getConfig().getString("messages.yaml_storage_shutdown_saved", "YAML storage shutdown complete. Data saved."));
     }
 
     private void saveClans() {

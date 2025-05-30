@@ -22,15 +22,16 @@ public final class TempleGuild extends JavaPlugin {
         String storageType = getConfig().getString("storage_type", "yaml").toLowerCase();
         if (storageType.equals("sqlite")) {
                 this.dataStorage = new SqliteStorage(this); // Use SqliteStorage
-                getLogger().info("SQLite storage selected.");
+                getLogger().info(getConfig().getString("messages.sqlite_selected", "SQLite storage selected."));
         } else {
             this.dataStorage = new YamlStorage(this);
-                getLogger().info("YAML storage selected.");
+                getLogger().info(getConfig().getString("messages.yaml_selected", "YAML storage selected."));
         }
 
         try {
                 this.dataStorage.initialize(); // This will now call SqliteStorage.initialize() if selected
-                getLogger().info("Data storage initialized successfully.");
+                getLogger().info(getConfig().getString("messages.data_storage_init_success", "Data storage initialized successfully using {storage_type}.")
+                                .replace("{storage_type}", storageType));
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to initialize data storage: " + e.getMessage(), e);
             getServer().getPluginManager().disablePlugin(this);
@@ -59,9 +60,9 @@ public final class TempleGuild extends JavaPlugin {
         // Hook into PlaceholderAPI
         if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) { // Changed from Bukkit.getPluginManager()
             new ru.templeguild.integrations.TempleGuildExpansion(this).register();
-            getLogger().info("Successfully hooked into PlaceholderAPI and registered placeholders.");
+            getLogger().info(getConfig().getString("messages.papi_hook_success", "Successfully hooked into PlaceholderAPI and registered placeholders."));
         } else {
-            getLogger().info("PlaceholderAPI not found, placeholders will not be available.");
+            getLogger().info(getConfig().getString("messages.papi_hook_fail_not_found", "PlaceholderAPI not found, placeholders will not be available."));
         }
 
         new org.bukkit.scheduler.BukkitRunnable() {
@@ -73,7 +74,7 @@ public final class TempleGuild extends JavaPlugin {
             }
         }.runTaskTimerAsynchronously(this, 20L * 60 * 5, 20L * 60 * 5); // Every 5 minutes
 
-        getLogger().info("TempleGuild plugin enabled!");
+        getLogger().info(getConfig().getString("messages.plugin_enabled", "TempleGuild plugin enabled!"));
     }
 
     @Override
@@ -86,12 +87,12 @@ public final class TempleGuild extends JavaPlugin {
         if (dataStorage != null) {
             try {
                 dataStorage.shutdown();
-                getLogger().info("Data storage shut down successfully.");
+                getLogger().info(getConfig().getString("messages.data_storage_shutdown_success", "Data storage shut down successfully."));
             } catch (Exception e) {
                 getLogger().log(Level.SEVERE, "Failed to shut down data storage: " + e.getMessage(), e);
             }
         }
-        getLogger().info("TempleGuild plugin disabled!");
+        getLogger().info(getConfig().getString("messages.plugin_disabled", "TempleGuild plugin disabled!"));
         instance = null;
     }
 

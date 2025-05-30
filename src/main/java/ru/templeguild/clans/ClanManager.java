@@ -7,6 +7,10 @@ import org.bukkit.Bukkit; // Added for Bukkit.getPlayer
 import ru.templeguild.utils.ChatUtils; // Added for ChatUtils
 import org.bukkit.inventory.Inventory; // Added for Inventory
 import ru.templeguild.utils.InventoryUtils; // Our new utility
+import net.md_5.bungee.api.chat.TextComponent;
+import net.md_5.bungee.api.chat.ClickEvent;
+import net.md_5.bungee.api.chat.HoverEvent;
+import net.md_5.bungee.api.chat.hover.content.Text; // For modern HoverEvent content
 import java.io.IOException; // Added for IOException
 
 import java.util.HashMap;
@@ -41,7 +45,8 @@ public class ClanManager {
     public void loadClans() {
         clansMap.clear();
         Set<String> clanNames = dataStorage.getAllClanNames();
-        plugin.getLogger().info("Loading " + clanNames.size() + " clan(s)...");
+        plugin.getLogger().info(plugin.getConfig().getString("messages.loading_clans_count", "Loading {count} clan(s)...")
+                                .replace("{count}", String.valueOf(clanNames.size())));
         for (String clanName : clanNames) {
             Clan clan = dataStorage.getClan(clanName);
             if (clan != null) {
@@ -52,7 +57,8 @@ public class ClanManager {
                 // members.forEach(clan::addMember); // Already handled by YamlStorage.getClan() logic
 
                 clansMap.put(clan.getName().toLowerCase(), clan);
-                plugin.getLogger().info("Loaded clan: " + clan.getName());
+                plugin.getLogger().info(plugin.getConfig().getString("messages.loaded_clan_specific", "Loaded clan: {name}")
+                                        .replace("{name}", clan.getName()));
                 if (clan.getSerializedStorage() != null && !clan.getSerializedStorage().isEmpty()) {
                     try {
                         String inventoryTitle = ChatUtils.format(plugin.getConfig().getString("messages.clan_storage_title", "&8Clan Storage: {clan_name}")
@@ -68,23 +74,23 @@ public class ClanManager {
                     playerClanCache.put(memberUUID, clan.getName().toLowerCase());
                 }
             } else {
-                plugin.getLogger().warning("Failed to load clan data for: " + clanName);
+                plugin.getLogger().warning("Failed to load clan data for: " + clanName); // Dynamic, keep as is
             }
         }
-        plugin.getLogger().info("Clan loading complete.");
+        plugin.getLogger().info(plugin.getConfig().getString("messages.clan_loading_complete", "Clan loading complete."));
     }
 
     public void createClan(String name, UUID leader) {
         if (isClanNameTaken(name)) {
             // This check should ideally be done before calling this method, e.g., in command logic
-            plugin.getLogger().warning("Attempted to create a clan with an existing name: " + name);
+            plugin.getLogger().warning("Attempted to create a clan with an existing name: " + name); // Dynamic, keep as is
             return;
         }
         Clan clan = new Clan(name, leader);
         dataStorage.createClan(clan); // This also adds leader to player data via DataStorage
         clansMap.put(name.toLowerCase(), clan);
         playerClanCache.put(leader, name.toLowerCase()); // Add leader to cache
-        plugin.getLogger().info("Clan '" + name + "' created by " + leader.toString());
+        plugin.getLogger().info("Clan '" + name + "' created by " + leader.toString()); // Dynamic, keep as is for now, or use complex formatter
     }
 
     public Clan getClan(String name) {
@@ -128,7 +134,7 @@ public class ClanManager {
             }
         }
         clanInventories.remove(clanName.toLowerCase());
-        plugin.getLogger().info("Clan '" + clanName + "' deleted.");
+        plugin.getLogger().info("Clan '" + clanName + "' deleted."); // Dynamic, keep as is for now
     }
 
     public void addPlayerToClan(Player player, Clan clan) {
@@ -161,47 +167,80 @@ public class ClanManager {
 
     public void sendInvite(Clan clan, Player inviter, Player invitedPlayer) {
         if (clan.isMember(invitedPlayer.getUniqueId())) {
-            inviter.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.invite_already_member", "&c{player_name} is already in your clan.")
-                    .replace("{player_name}", invitedPlayer.getName())));
+            ChatUtils.sendMessages(inviter, plugin, "messages.invite_already_member", "{player_name}", invitedPlayer.getName());
             return;
         }
 
         if (getClanByPlayer(invitedPlayer.getUniqueId()) != null) {
-            inviter.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.invite_player_in_another_clan", "&c{player_name} is already in another clan.")
-                    .replace("{player_name}", invitedPlayer.getName())));
+            ChatUtils.sendMessages(inviter, plugin, "messages.invite_player_in_another_clan", "{player_name}", invitedPlayer.getName());
             return;
         }
 
-        // Check if player already has a pending invite from this clan
         List<ClanInvite> playerInvites = pendingInvites.getOrDefault(invitedPlayer.getUniqueId(), new ArrayList<>());
         for (ClanInvite existingInvite : playerInvites) {
             if (existingInvite.getClanName().equalsIgnoreCase(clan.getName()) && !existingInvite.isExpired(inviteTimeoutMillis)) {
-                inviter.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.invite_already_pending", "&cAn invite to {clan_name} for {player_name} is already pending.")
-                        .replace("{clan_name}", clan.getName())
-                        .replace("{player_name}", invitedPlayer.getName())));
+                ChatUtils.sendMessages(inviter, plugin, "messages.invite_already_pending", "{clan_name}", clan.getName(), "{player_name}", invitedPlayer.getName());
                 return;
             }
         }
 
         ClanInvite invite = new ClanInvite(clan.getName(), invitedPlayer.getUniqueId(), inviter.getUniqueId());
-        playerInvites.removeIf(i -> i.getClanName().equalsIgnoreCase(clan.getName())); // Remove old/expired invite for this clan
+        playerInvites.removeIf(i -> i.getClanName().equalsIgnoreCase(clan.getName()) && i.isExpired(inviteTimeoutMillis)); // Clean up old/expired for this specific clan before adding new
         playerInvites.add(invite);
         pendingInvites.put(invitedPlayer.getUniqueId(), playerInvites);
 
-        inviter.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.invite_sent", "&aInvite sent to {player_name} to join {clan_name}.")
-                .replace("{player_name}", invitedPlayer.getName())
-                .replace("{clan_name}", clan.getName())));
 
-        invitedPlayer.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.invite_received", "&6You have been invited to join clan {clan_name} by {inviter_name}. Type &e/clan accept {clan_name} &6or &e/clan decline {clan_name}&6.")
-                .replace("{clan_name}", clan.getName())
-                .replace("{inviter_name}", inviter.getName())));
+        // Notify inviter (remains unchanged)
+        ChatUtils.sendMessages(inviter, plugin, "messages.invite_sent",
+            "{player_name}", invitedPlayer.getName(),
+            "{clan_name}", clan.getName());
+
+        // Construct and send the JSON message to the invitedPlayer
+        String baseInviteMessage = ChatUtils.getFormattedString(plugin, "messages.invite_received_base",
+                "{clan_name}", clan.getName(),
+                "{inviter_name}", inviter.getName());
+
+        TextComponent mainMessageComponent = new TextComponent(TextComponent.fromLegacyText(ChatUtils.format(baseInviteMessage))); // Properly parse colors for the base message
+        mainMessageComponent.addExtra(" "); // Add space before buttons
+
+        // Create [Accept] button
+        String acceptButtonText = ChatUtils.getFormattedString(plugin, "messages.invite_button_accept_text");
+        TextComponent acceptButton = new TextComponent(TextComponent.fromLegacyText(ChatUtils.format(acceptButtonText))); // Parse colors
+        acceptButton.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/clan accept " + clan.getName()));
+        String acceptHoverText = ChatUtils.getFormattedString(plugin, "messages.invite_button_accept_hover", "{clan_name}", clan.getName());
+        acceptButton.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatUtils.format(acceptHoverText)))); // Parse colors for hover
+
+        // Create [Decline] button
+        String declineButtonText = ChatUtils.getFormattedString(plugin, "messages.invite_button_decline_text");
+        TextComponent declineButton = new TextComponent(TextComponent.fromLegacyText(ChatUtils.format(declineButtonText))); // Parse colors
+        declineButton.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, "/clan decline " + clan.getName()));
+        String declineHoverText = ChatUtils.getFormattedString(plugin, "messages.invite_button_decline_hover", "{clan_name}", clan.getName());
+        declineButton.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(ChatUtils.format(declineHoverText)))); // Parse colors for hover
+
+        // Assemble the message
+        mainMessageComponent.addExtra(acceptButton);
+        mainMessageComponent.addExtra(" "); // Space between buttons
+        mainMessageComponent.addExtra(declineButton);
+
+        // Send the JSON message
+        invitedPlayer.spigot().sendMessage(mainMessageComponent);
+
+        // Send additional instruction lines if defined (from the rest of invite_received_instructions list)
+        // These are sent as separate, normal messages after the clickable component.
+        List<String> additionalInstructions = plugin.getConfig().getStringList("messages.invite_received_instructions");
+        for (String line : additionalInstructions) {
+            if (line != null && !line.isEmpty()) { // Ensure line is not null or empty
+                String processedLine = line.replace("{clan_name}", clan.getName()).replace("{inviter_name}", inviter.getName());
+                invitedPlayer.sendMessage(ChatUtils.format(processedLine));
+            }
+        }
     }
 
     public boolean acceptInvite(Player player, String clanNameToAccept) {
         cleanupExpiredInvites(player.getUniqueId());
         List<ClanInvite> invites = pendingInvites.get(player.getUniqueId());
         if (invites == null || invites.isEmpty()) {
-            player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.invite_none_pending", "&cYou have no pending clan invitations.")));
+            ChatUtils.sendMessages(player, plugin, "messages.invite_none_pending");
             return false;
         }
 
@@ -214,41 +253,34 @@ public class ClanManager {
         }
 
         if (acceptedInvite == null) {
-            player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.invite_not_found_for_clan", "&cYou don't have an invite from clan {clan_name}.")
-                    .replace("{clan_name}", clanNameToAccept)));
+            ChatUtils.sendMessages(player, plugin, "messages.invite_not_found_for_clan", "{clan_name}", clanNameToAccept);
             return false;
         }
 
         Clan clan = getClan(acceptedInvite.getClanName());
         if (clan == null) {
-            player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.clan_disbanded_on_accept", "&cThe clan {clan_name} seems to have been disbanded.")
-                    .replace("{clan_name}", acceptedInvite.getClanName())));
+            ChatUtils.sendMessages(player, plugin, "messages.clan_disbanded_on_accept", "{clan_name}", acceptedInvite.getClanName());
             invites.remove(acceptedInvite);
             return false;
         }
 
         if (getClanByPlayer(player.getUniqueId()) != null) {
-            player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.already_in_clan_on_accept", "&cYou joined another clan before accepting this invite.")));
+            ChatUtils.sendMessages(player, plugin, "messages.already_in_clan_on_accept");
             invites.remove(acceptedInvite);
             return false;
         }
 
-        // Add player to clan
         dataStorage.addPlayerToClan(player.getUniqueId(), clan.getName());
-        clan.addMember(player.getUniqueId()); // Update in-memory clan object
-        playerClanCache.put(player.getUniqueId(), clan.getName().toLowerCase()); // Update cache
+        clan.addMember(player.getUniqueId());
+        playerClanCache.put(player.getUniqueId(), clan.getName().toLowerCase());
 
-        // Notify clan members (optional, can be noisy)
-        String joinMessage = ChatUtils.format(plugin.getConfig().getString("messages.player_joined_clan", "&e{player_name} has joined the clan!")
-                                        .replace("{player_name}", player.getName()));
+        String joinMessage = ChatUtils.getFormattedString(plugin, "messages.player_joined_clan", "{player_name}", player.getName());
         clan.getMembers().stream()
             .map(Bukkit::getPlayer)
             .filter(java.util.Objects::nonNull)
-            .forEach(member -> member.sendMessage(joinMessage));
+            .forEach(member -> member.sendMessage(joinMessage)); // Already formatted
 
-
-        player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.invite_accepted", "&aYou have joined clan {clan_name}!")
-                .replace("{clan_name}", clan.getName())));
+        ChatUtils.sendMessages(player, plugin, "messages.invite_accepted", "{clan_name}", clan.getName());
 
         invites.remove(acceptedInvite);
         if (invites.isEmpty()) {
@@ -260,8 +292,8 @@ public class ClanManager {
     public boolean declineInvite(Player player, String clanNameToDecline) {
         cleanupExpiredInvites(player.getUniqueId());
         List<ClanInvite> invites = pendingInvites.get(player.getUniqueId());
-        if (invites == null) {
-            player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.invite_none_pending", "&cYou have no pending clan invitations.")));
+        if (invites == null) { // Should be invites.isEmpty() or check after getOrDefault
+            ChatUtils.sendMessages(player, plugin, "messages.invite_none_pending");
             return false;
         }
 
@@ -274,8 +306,7 @@ public class ClanManager {
         }
 
         if (declinedInvite == null) {
-             player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.invite_not_found_for_clan", "&cYou don't have an invite from clan {clan_name}.")
-                    .replace("{clan_name}", clanNameToDecline)));
+             ChatUtils.sendMessages(player, plugin, "messages.invite_not_found_for_clan", "{clan_name}", clanNameToDecline);
             return false;
         }
 
@@ -286,13 +317,10 @@ public class ClanManager {
 
         Player inviter = Bukkit.getPlayer(declinedInvite.getInviterUUID());
         if(inviter != null && inviter.isOnline()){
-            inviter.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.invite_declined_to_inviter", "&e{player_name} declined your invitation to join {clan_name}.")
-                .replace("{player_name}", player.getName())
-                .replace("{clan_name}", declinedInvite.getClanName())));
+            ChatUtils.sendMessages(inviter, plugin, "messages.invite_declined_to_inviter", "{player_name}", player.getName(), "{clan_name}", declinedInvite.getClanName());
         }
 
-        player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.invite_declined", "&aYou have declined the invitation from clan {clan_name}.")
-                .replace("{clan_name}", declinedInvite.getClanName())));
+        ChatUtils.sendMessages(player, plugin, "messages.invite_declined", "{clan_name}", declinedInvite.getClanName());
         return true;
     }
 
@@ -317,24 +345,24 @@ public class ClanManager {
                 iterator.remove();
             }
         }
-         plugin.getLogger().info("Cleaned up expired clan invitations.");
+         plugin.getLogger().info(plugin.getConfig().getString("messages.expired_invites_cleaned", "Cleaned up expired clan invitations."));
     }
 
     public boolean toggleClanChat(Player player) {
         UUID playerUUID = player.getUniqueId();
         if (getClanByPlayer(playerUUID) == null) {
-            player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.not_in_clan_for_chat_toggle", "&cYou must be in a clan to toggle clan chat.")));
-            return false; // Not really a failure of toggle, but user can't use it
+            ChatUtils.sendMessages(player, plugin, "messages.not_in_clan_for_chat_toggle");
+            return false;
         }
 
         if (clanChatToggled.contains(playerUUID)) {
             clanChatToggled.remove(playerUUID);
-            player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.clan_chat_toggled_off", "&aClan chat toggled &cOFF&a.")));
-            return false; // Indicates now off
+            ChatUtils.sendMessages(player, plugin, "messages.clan_chat_toggled_off");
+            return false;
         } else {
             clanChatToggled.add(playerUUID);
-            player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.clan_chat_toggled_on", "&aClan chat toggled &2ON&a.")));
-            return true; // Indicates now on
+            ChatUtils.sendMessages(player, plugin, "messages.clan_chat_toggled_on");
+            return true;
         }
     }
 
@@ -349,53 +377,45 @@ public class ClanManager {
     public void sendClanChatMessage(Player sender, String message) {
         Clan clan = getClanByPlayer(sender.getUniqueId());
         if (clan == null) {
-            sender.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.not_in_clan_to_chat", "&cYou are not in a clan to send a message.")));
-            // If they were toggled but left/got kicked, untoggle them
+            ChatUtils.sendMessages(sender, plugin, "messages.not_in_clan_to_chat");
             clanChatToggled.remove(sender.getUniqueId());
             return;
         }
 
-        String format = plugin.getConfig().getString("messages.clan_chat_format", "&8[&aClan&8] &7{player_name}: &f{message}");
-        String formattedMessage = ChatUtils.format(format
-                .replace("{clan_name}", clan.getName()) // In case you want to use {clan_name} in format
-                .replace("{player_name}", sender.getName())
-                .replace("{message}", message));
+        String formattedMessage = ChatUtils.getFormattedString(plugin, "messages.clan_chat_format",
+                "{clan_name}", clan.getName(),
+                "{player_name}", sender.getName(),
+                "{message}", message);
 
         clan.getMembers().stream()
             .map(Bukkit::getPlayer)
-            .filter(java.util.Objects::nonNull) // Ensure player is online
-            .forEach(member -> member.sendMessage(formattedMessage));
-
-        // Optional: Log to console
-        // plugin.getLogger().info("[ClanChat] " + clan.getName() + " | " + sender.getName() + ": " + message);
+            .filter(java.util.Objects::nonNull)
+            .forEach(member -> member.sendMessage(formattedMessage)); // Already formatted
     }
 
     public void toggleClanPvp(Player player) {
         Clan clan = getClanByPlayer(player.getUniqueId());
         if (clan == null) {
-            player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.not_in_clan", "&cYou are not in a clan.")));
+            ChatUtils.sendMessages(player, plugin, "messages.not_in_clan");
             return;
         }
 
-        // Permission check: Only leader (or officers, to be added later) can toggle PvP
         if (!clan.getLeader().equals(player.getUniqueId())) {
-            player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.no_pvp_toggle_permission", "&cOnly the clan leader can toggle PvP status.")));
+            ChatUtils.sendMessages(player, plugin, "messages.no_pvp_toggle_permission");
             return;
         }
 
         boolean newPvpState = !clan.isPvpEnabled();
         clan.setPvpEnabled(newPvpState);
-        dataStorage.updateClan(clan); // Persist the change
+        dataStorage.updateClan(clan);
 
         String messagePath = newPvpState ? "messages.clan_pvp_enabled" : "messages.clan_pvp_disabled";
-        String message = ChatUtils.format(plugin.getConfig().getString(messagePath)
-                                        .replace("{clan_name}", clan.getName()));
+        String formattedClanMessage = ChatUtils.getFormattedString(plugin, messagePath, "{clan_name}", clan.getName());
 
-        // Notify all clan members
         clan.getMembers().stream()
             .map(Bukkit::getPlayer)
             .filter(java.util.Objects::nonNull)
-            .forEach(member -> member.sendMessage(message));
+            .forEach(member -> member.sendMessage(formattedClanMessage)); // Already formatted
     }
 
     // Method to get or create clan inventory
@@ -404,21 +424,16 @@ public class ClanManager {
         if (clanInventories.containsKey(clanNameLower)) {
             return clanInventories.get(clanNameLower);
         } else {
-            // Create a new inventory if not found (e.g. first time or if failed to load)
-            int size = plugin.getConfig().getInt("clan_storage.default_size", 27); // Default 3 rows, make configurable
-            if (size % 9 != 0 || size > 54) size = 27; // Validate size
+            int size = plugin.getConfig().getInt("clan_storage.default_size", 27);
+            if (size % 9 != 0 || size > 54) size = 27;
 
-            String inventoryTitle = ChatUtils.format(plugin.getConfig().getString("messages.clan_storage_title", "&8Clan Storage: {clan_name}")
-                                                .replace("{clan_name}", clan.getName()));
-            Inventory inv = Bukkit.createInventory(null, size, inventoryTitle);
+            String inventoryTitle = ChatUtils.getFormattedString(plugin, "messages.clan_storage_title", "{clan_name}", clan.getName());
+            Inventory inv = Bukkit.createInventory(null, size, inventoryTitle); // Title is already formatted
             clanInventories.put(clanNameLower, inv);
-            // Optionally save this newly created (empty) inventory back to storage immediately
-            // saveClanInventory(clan, inv); // Or rely on saving when plugin disables or on specific events
             return inv;
         }
     }
 
-    // Method to save a clan's inventory
     public void saveClanInventory(Clan clan) {
         String clanNameLower = clan.getName().toLowerCase();
         Inventory inv = clanInventories.get(clanNameLower);
@@ -434,7 +449,7 @@ public class ClanManager {
 
     // Method to save all loaded clan inventories (e.g., onDisable)
     public void saveAllClanInventories() {
-        plugin.getLogger().info("Saving all loaded clan inventories...");
+        plugin.getLogger().info(plugin.getConfig().getString("messages.log_saving_all_inventories", "Saving all loaded clan inventories..."));
         for (Map.Entry<String, Clan> entry : clansMap.entrySet()) {
             Clan clan = entry.getValue();
             // Ensure inventory is loaded if it wasn't already (though usually it would be if accessed)
@@ -444,6 +459,6 @@ public class ClanManager {
                  saveClanInventory(clan);
             }
         }
-        plugin.getLogger().info("Clan inventories saving complete.");
+        plugin.getLogger().info(plugin.getConfig().getString("messages.log_inventories_saving_complete", "Clan inventories saving complete."));
     }
 }

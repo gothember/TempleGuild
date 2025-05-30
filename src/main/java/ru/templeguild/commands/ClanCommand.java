@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.bukkit.configuration.ConfigurationSection; // Added for help entries
 
 public class ClanCommand implements CommandExecutor, TabCompleter {
 
@@ -28,95 +29,103 @@ public class ClanCommand implements CommandExecutor, TabCompleter {
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         if (!(sender instanceof Player)) {
-            sender.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.players_only", "&cOnly players can use this command.")));
+            ChatUtils.sendMessages(sender, plugin, "messages.players_only");
+            return true;
+        }
+
+        // Allow console to use /clan help or list clans, etc. if we add such features.
+        // For now, many commands are player-centric.
+        // Let's allow console for help.
+        if (args.length > 0 && args[0].equalsIgnoreCase("help")) {
+            displayHelp(sender);
+            return true;
+        }
+        if (!(sender instanceof Player)) {
+            ChatUtils.sendMessages(sender, plugin, "messages.players_only_for_most_commands");
             return true;
         }
 
         Player player = (Player) sender;
 
         if (args.length == 0) {
-            // Send help message (to be implemented later)
-            player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.clan_help", "&eUsage: /clan <subcommand>")));
+            displayHelp(player); // Display help if just /clan is typed
             return true;
         }
 
         String subCommand = args[0].toLowerCase();
 
-        if (subCommand.equals("create")) {
+        if (subCommand.equals("help")) {
+            // Potentially add help for a specific command: /clan help <subcommand_name>
+            // For now, general help is displayed.
+            displayHelp(player);
+            return true;
+        } else if (subCommand.equals("create")) {
             if (args.length < 2) {
-                player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.clan_create_usage", "&cUsage: /clan create <name>")));
+                ChatUtils.sendMessages(player, plugin, "messages.clan_create_usage");
                 return true;
             }
             if (!player.hasPermission("templeguild.clan.create")) {
-                 player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.no_permission", "&cYou don't have permission to do that.")));
+                 ChatUtils.sendMessages(player, plugin, "messages.no_permission");
                  return true;
             }
 
             String clanName = args[1];
 
-            // Validate clan name (e.g., length, characters - basic for now)
             if (clanName.length() < 3 || clanName.length() > 16) {
-                player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.clan_name_length", "&cClan name must be between 3 and 16 characters.")));
+                ChatUtils.sendMessages(player, plugin, "messages.clan_name_length");
                 return true;
             }
             if (!clanName.matches("^[a-zA-Z0-9_]+$")) {
-                player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.clan_name_invalid_chars", "&cClan name can only contain letters, numbers, and underscores.")));
+                ChatUtils.sendMessages(player, plugin, "messages.clan_name_invalid_chars");
                 return true;
             }
 
             if (clanManager.isClanNameTaken(clanName)) {
-                player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.clan_name_taken", "&cThat clan name is already taken.")));
+                ChatUtils.sendMessages(player, plugin, "messages.clan_name_taken");
                 return true;
             }
 
             if (clanManager.getClanByPlayer(player.getUniqueId()) != null) {
-                player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.already_in_clan", "&cYou are already in a clan.")));
+                ChatUtils.sendMessages(player, plugin, "messages.already_in_clan");
                 return true;
             }
 
             clanManager.createClan(clanName, player.getUniqueId());
-            String createdMessage = plugin.getConfig().getString("messages.clan_created", "&#00FF00Your clan {clan_name} has been created!")
-                                        .replace("{clan_name}", clanName);
-            player.sendMessage(ChatUtils.format(createdMessage));
+            ChatUtils.sendMessages(player, plugin, "messages.clan_created", "{clan_name}", clanName);
             return true;
         } else if (subCommand.equals("invite")) {
             if (!player.hasPermission("templeguild.clan.invite")) {
-                 player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.no_permission", "&cYou don't have permission to do that.")));
+                 ChatUtils.sendMessages(player, plugin, "messages.no_permission");
                  return true;
             }
             Clan playerClan = clanManager.getClanByPlayer(player.getUniqueId());
             if (playerClan == null) {
-                player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.not_in_clan", "&cYou are not in a clan.")));
+                ChatUtils.sendMessages(player, plugin, "messages.not_in_clan");
                 return true;
             }
-            // Add leader/officer permission check here later if needed
-            // if (!playerClan.getLeader().equals(player.getUniqueId()) && !playerClan.isOfficer(player.getUniqueId())) {
-            //    player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.no_invite_permission", "&cYou don't have permission to invite players to this clan.")));
-            //    return true;
-            // }
+
             if (args.length < 2) {
-                player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.clan_invite_usage", "&cUsage: /clan invite <player>")));
+                ChatUtils.sendMessages(player, plugin, "messages.clan_invite_usage");
                 return true;
             }
-            Player invitedPlayer = plugin.getServer().getPlayerExact(args[1]); // Changed from Bukkit.getPlayerExact
+            Player invitedPlayer = plugin.getServer().getPlayerExact(args[1]);
             if (invitedPlayer == null || !invitedPlayer.isOnline()) {
-                player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.player_not_online", "&cPlayer {player_name} is not online.")
-                        .replace("{player_name}", args[1])));
+                ChatUtils.sendMessages(player, plugin, "messages.player_not_online", "{player_name}", args[1]);
                 return true;
             }
             if (invitedPlayer.equals(player)) {
-                player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.cannot_invite_self", "&cYou cannot invite yourself.")));
+                ChatUtils.sendMessages(player, plugin, "messages.cannot_invite_self");
                 return true;
             }
             clanManager.sendInvite(playerClan, player, invitedPlayer);
             return true;
         } else if (subCommand.equals("accept")) {
              if (!player.hasPermission("templeguild.clan.accept")) {
-                 player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.no_permission", "&cYou don't have permission to do that.")));
+                 ChatUtils.sendMessages(player, plugin, "messages.no_permission");
                  return true;
             }
             if (args.length < 2) {
-                player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.clan_accept_usage", "&cUsage: /clan accept <clan_name>")));
+                ChatUtils.sendMessages(player, plugin, "messages.clan_accept_usage");
                 return true;
             }
             String clanToAccept = args[1];
@@ -124,74 +133,103 @@ public class ClanCommand implements CommandExecutor, TabCompleter {
             return true;
         } else if (subCommand.equals("decline")) {
              if (!player.hasPermission("templeguild.clan.decline")) {
-                 player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.no_permission", "&cYou don't have permission to do that.")));
+                 ChatUtils.sendMessages(player, plugin, "messages.no_permission");
                  return true;
             }
             if (args.length < 2) {
-                player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.clan_decline_usage", "&cUsage: /clan decline <clan_name>")));
+                ChatUtils.sendMessages(player, plugin, "messages.clan_decline_usage");
                 return true;
             }
             String clanToDecline = args[1];
             clanManager.declineInvite(player, clanToDecline);
             return true;
-        } else if (subCommand.equals("chat") || subCommand.equals("c")) { // Added alias "c"
+        } else if (subCommand.equals("chat") || subCommand.equals("c")) {
             if (!player.hasPermission("templeguild.clan.chat")) {
-                 player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.no_permission", "&cYou don't have permission to do that.")));
+                 ChatUtils.sendMessages(player, plugin, "messages.no_permission");
                  return true;
             }
-            if (clanManager.getClanByPlayer(player.getUniqueId()) == null) {
-                player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.not_in_clan_to_chat", "&cYou must be in a clan to use clan chat.")));
+            if (clanManager.getClanByPlayer(player.getUniqueId()) == null) { // Handled by ClanManager too, but good for early exit
+                ChatUtils.sendMessages(player, plugin, "messages.not_in_clan_to_chat");
                 return true;
             }
 
             if (args.length == 1) {
-                // Toggle clan chat
                 clanManager.toggleClanChat(player);
             } else {
-                // Send a single clan chat message
                 String message = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
                 clanManager.sendClanChatMessage(player, message);
             }
             return true;
         } else if (subCommand.equals("pvp")) {
             if (!player.hasPermission("templeguild.clan.pvp.toggle")) {
-                 player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.no_permission", "&cYou don't have permission to do that.")));
+                 ChatUtils.sendMessages(player, plugin, "messages.no_permission");
                  return true;
             }
-            // Ensure player is in a clan before attempting to toggle PvP
-            if (clanManager.getClanByPlayer(player.getUniqueId()) == null) {
-                player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.not_in_clan", "&cYou are not in a clan.")));
+            if (clanManager.getClanByPlayer(player.getUniqueId()) == null) { // Handled by ClanManager too
+                ChatUtils.sendMessages(player, plugin, "messages.not_in_clan");
                 return true;
             }
-            clanManager.toggleClanPvp(player); // Logic is handled in ClanManager
+            clanManager.toggleClanPvp(player);
             return true;
         } else if (subCommand.equals("storage")) {
             if (!player.hasPermission("templeguild.clan.storage.access")) {
-                 player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.no_permission", "&cYou don't have permission to do that.")));
+                 ChatUtils.sendMessages(player, plugin, "messages.no_permission");
                  return true;
             }
             Clan playerClan = clanManager.getClanByPlayer(player.getUniqueId());
             if (playerClan == null) {
-                player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.not_in_clan", "&cYou are not in a clan.")));
+                ChatUtils.sendMessages(player, plugin, "messages.not_in_clan");
                 return true;
             }
-            // Permission for specific storage actions (e.g. only leader can modify?) can be added here
-            // For now, any member can access if they have the base permission.
 
             Inventory clanInv = clanManager.getClanInventory(playerClan);
             player.openInventory(clanInv);
             return true;
         }
-        // ... other subcommands later
 
-        player.sendMessage(ChatUtils.format(plugin.getConfig().getString("messages.unknown_subcommand", "&cUnknown subcommand. Use /clan help.")));
+        ChatUtils.sendMessages(player, plugin, "messages.unknown_subcommand", "{command}", subCommand);
         return true;
+    }
+
+    private void displayHelp(CommandSender sender) {
+        ChatUtils.sendMessages(sender, plugin, "messages.clan_help_header");
+
+        ConfigurationSection helpEntries = plugin.getConfig().getConfigurationSection("messages.clan_help_entries");
+        if (helpEntries != null) {
+            List<String> formatList = plugin.getConfig().getStringList("messages.clan_help_format");
+            if (formatList.isEmpty()) { // Fallback if format is missing
+                formatList.add("&6/clan {command} {arguments} &7- {description}");
+            }
+
+            for (String key : helpEntries.getKeys(false)) {
+                String permission = helpEntries.getString(key + ".permission");
+                if (permission != null && !permission.isEmpty() && !(sender instanceof org.bukkit.command.ConsoleCommandSender) && !sender.hasPermission(permission)) {
+                    // Skip showing commands they can't use, unless it's console
+                    continue;
+                }
+
+                String commandName = key;
+                String arguments = helpEntries.getString(key + ".arguments", "");
+                String description = helpEntries.getString(key + ".description", "No description available.");
+
+                for (String formatLine : formatList) {
+                    String helpLine = formatLine.replace("{command}", commandName)
+                                                .replace("{arguments}", arguments)
+                                                .replace("{description}", description);
+                    sender.sendMessage(ChatUtils.format(helpLine)); // Use ChatUtils.format directly for single lines from loop
+                }
+            }
+        } else {
+            ChatUtils.sendMessages(sender, plugin, "messages.clan_help_unavailable");
+        }
+
+        ChatUtils.sendMessages(sender, plugin, "messages.clan_help_footer");
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> subcommands = Arrays.asList("create", "invite", "accept", "decline", "chat", "pvp", "storage" /*, help, leave, disband, etc. */); // Added "accept", "decline"
+            List<String> subcommands = Arrays.asList("create", "invite", "accept", "decline", "chat", "pvp", "storage", "help" /*, help, leave, disband, etc. */);
             return subcommands.stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());

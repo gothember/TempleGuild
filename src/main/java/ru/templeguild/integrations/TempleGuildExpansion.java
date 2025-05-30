@@ -53,28 +53,28 @@ public class TempleGuildExpansion extends PlaceholderExpansion {
         Clan playerClan = clanManager.getClanByPlayer(offlinePlayer.getUniqueId());
 
         if (params.equalsIgnoreCase("name")) {
-            return playerClan != null ? playerClan.getName() : plugin.getConfig().getString("placeholderapi.no_clan_name", "No Clan");
+            return playerClan != null ? playerClan.getName() : ChatUtils.getFormattedString(plugin, "placeholderapi.no_clan_name");
         }
 
         if (params.equalsIgnoreCase("in_clan")) {
-            return playerClan != null ? "true" : "false";
+            return playerClan != null ? "true" : "false"; // This is fine as non-message
         }
 
         if (params.equalsIgnoreCase("check_pvp")) {
             if (playerClan != null) {
-                return playerClan.isPvpEnabled() ? "true" : "false";
+                return playerClan.isPvpEnabled() ? "true" : "false"; // Fine as non-message
             }
-            return plugin.getConfig().getString("placeholderapi.pvp_status_no_clan", "false"); // Or some other default
+            return ChatUtils.getFormattedString(plugin, "placeholderapi.pvp_status_no_clan");
         }
 
         if (params.equalsIgnoreCase("leader_name")) {
             if (playerClan != null) {
                 OfflinePlayer leader = Bukkit.getOfflinePlayer(playerClan.getLeader());
-                return leader != null ? leader.getName() : plugin.getConfig().getString("placeholderapi.leader_name_unknown", "Unknown");
+                return leader != null && leader.getName() != null ? leader.getName() : ChatUtils.getFormattedString(plugin, "placeholderapi.leader_name_unknown");
             }
-            return plugin.getConfig().getString("placeholderapi.leader_name_no_clan", "No Clan");
+            return ChatUtils.getFormattedString(plugin, "placeholderapi.leader_name_no_clan");
         }
 
-        return null; // Placeholder not found
+        return null;
     }
 }

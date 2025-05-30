@@ -72,7 +72,7 @@ public class SqliteStorage implements DataStorage {
                     "clan_name TEXT, " +
                     "FOREIGN KEY(clan_name) REFERENCES clans(clan_name) ON DELETE SET NULL ON UPDATE CASCADE)");
 
-            plugin.getLogger().info("SQLite storage initialized and tables created/verified.");
+            plugin.getLogger().info(plugin.getConfig().getString("messages.sqlite_storage_initialized_tables_ok", "SQLite storage initialized and tables created/verified."));
 
         } catch (SQLException e) {
             plugin.getLogger().log(Level.SEVERE, "Error creating SQLite tables", e);
@@ -84,7 +84,7 @@ public class SqliteStorage implements DataStorage {
         try {
             if (connection != null && !connection.isClosed()) {
                 connection.close();
-                plugin.getLogger().info("SQLite connection closed.");
+                plugin.getLogger().info(plugin.getConfig().getString("messages.sqlite_connection_closed", "SQLite connection closed."));
             }
         } catch (SQLException e) {
             plugin.getLogger().log(Level.SEVERE, "Error closing SQLite connection", e);

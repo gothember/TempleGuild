@@ -37,11 +37,7 @@ public class PlayerDamageListener implements Listener {
             // Both in the same clan, check clan's PvP status
             if (!victimClan.isPvpEnabled()) {
                 event.setCancelled(true);
-                // Optional: Send a message to the attacker
-                String pvpDisabledMessage = plugin.getConfig().getString("messages.pvp_disabled_feedback_attacker");
-                if (pvpDisabledMessage != null && !pvpDisabledMessage.isEmpty()) {
-                     attacker.sendMessage(ChatUtils.format(pvpDisabledMessage));
-                }
+                ChatUtils.sendMessages(attacker, plugin, "messages.pvp_disabled_feedback_attacker");
             }
         }
     }
