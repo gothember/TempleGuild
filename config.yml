@@ -1,0 +1,55 @@
+# Configuration for TempleGuild Plugin
+storage_type: yaml # or sqlite
+
+messages:
+  players_only: "&cOnly players can use this command."
+  no_permission: "&cYou don't have permission to do that."
+  clan_help: "&eUsage: /clan <subcommand>" # Basic placeholder
+  unknown_subcommand: "&cUnknown subcommand. Use /clan help."
+
+  clan_create_usage: "&cUsage: /clan create <name>"
+  clan_name_length: "&cClan name must be between 3 and 16 characters."
+  clan_name_invalid_chars: "&cClan name can only contain letters, numbers, and underscores."
+  clan_name_taken: "&cThat clan name is already taken."
+  already_in_clan: "&cYou are already in a clan."
+  clan_created: "&#32a852Your clan &b{clan_name}&#32a852 has been created!"
+
+  not_in_clan: "&cYou are not in a clan."
+  player_not_online: "&cPlayer {player_name} is not online."
+  cannot_invite_self: "&cYou cannot invite yourself."
+  invite_already_member: "&c{player_name} is already in your clan."
+  invite_player_in_another_clan: "&c{player_name} is already in another clan."
+  invite_already_pending: "&cAn invite to {clan_name} for {player_name} is already pending."
+  invite_sent: "&aInvite sent to {player_name} to join {clan_name}."
+  invite_received: "&6You have been invited to join clan {clan_name} by {inviter_name}. Type &e/clan accept {clan_name} &6or &e/clan decline {clan_name}&6."
+  invite_none_pending: "&cYou have no pending clan invitations."
+  invite_not_found_for_clan: "&cYou don't have an invite from clan {clan_name}."
+  clan_disbanded_on_accept: "&cThe clan {clan_name} seems to have been disbanded."
+  already_in_clan_on_accept: "&cYou joined another clan before accepting this invite."
+  player_joined_clan: "&#74c72c{player_name} has joined the clan!"
+  invite_accepted: "&#74c72cYou have joined clan {clan_name}!"
+  invite_declined_to_inviter: "&e{player_name} declined your invitation to join {clan_name}."
+  invite_declined: "&aYou have declined the invitation from clan {clan_name}."
+
+  clan_invite_usage: "&cUsage: /clan invite <player>"
+  clan_accept_usage: "&cUsage: /clan accept <clan_name>"
+  clan_decline_usage: "&cUsage: /clan decline <clan_name>"
+
+  not_in_clan_for_chat_toggle: "&cYou must be in a clan to toggle clan chat."
+  not_in_clan_to_chat: "&cYou must be in a clan to use clan chat."
+  clan_chat_toggled_on: "&#62f569Clan chat toggled &2ON&a. Your messages will now go to your clan."
+  clan_chat_toggled_off: "&#f59e62Clan chat toggled &cOFF&a. Your messages will now go to public chat."
+  clan_chat_format: "&8[&2{clan_name}&8] &a{player_name}: &7{message}"
+
+  no_pvp_toggle_permission: "&cOnly the clan leader can toggle PvP status."
+  clan_pvp_enabled: "&#c91818Clan PvP has been &aENABLED&c for {clan_name}."
+  clan_pvp_disabled: "&#c91818Clan PvP has been &cDISABLED&c for {clan_name}."
+  pvp_disabled_feedback_attacker: "&cFriendly fire is off in your clan!"
+
+  clan_storage_title: "&2Clan Storage: &a{clan_name}" # Title for the inventory
+  clan_storage_saved: "&aClan storage saved."
+  # no_invite_permission: "&cYou don't have permission to invite players to this clan." # For future officer roles
+  # ... other messages will be added as features are implemented
+
+clan_storage:
+  default_size: 27 # Must be multiple of 9, max 54. (e.g., 9, 18, 27, 36, 45, 54)

@@ -1,0 +1,34 @@
+name: TempleGuild
+version: 1.0.0
+main: ru.templeguild.TempleGuild
+api-version: 1.16
+author: YourName # Or Jules
+description: A clan plugin for Paper 1.16.5+
+commands:
+  clan:
+    description: Main command for clan management.
+    usage: /clan help
+    aliases: [c, cl] # Optional aliases
+permissions:
+  templeguild.clan.create:
+    description: Allows creating a new clan.
+    default: op
+  templeguild.clan.invite:
+    description: Allows inviting players to a clan.
+    default: op
+  templeguild.clan.accept:
+    description: Allows accepting clan invitations.
+    default: true
+  templeguild.clan.decline:
+    description: Allows declining clan invitations.
+    default: true
+  templeguild.clan.chat:
+    description: Allows using clan chat and toggling clan chat mode.
+    default: true
+  templeguild.clan.pvp.toggle:
+    description: Allows toggling clan PvP status (leader only by default).
+    default: op
+  templeguild.clan.storage.access:
+    description: Allows opening and using the clan storage.
+    default: true # Or op, or based on clan rank later
+  # Add more permissions as commands are implemented
