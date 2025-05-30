@@ -154,7 +154,8 @@ public class YamlStorage implements DataStorage {
     public void removePlayerFromClan(UUID playerUUID) {
         String clanName = getClanNameForPlayer(playerUUID);
         playersConfig.set("players." + playerUUID.toString(), null); // Remove player entry or just clan field
-        TempleGuild.getInstance().getClanManager().removeFromClanChatToggleOnLeave(playerUUID); // Add this
+        TempleGuild.getInstance().getClanManager().removeFromClanChatToggleOnLeave(playerUUID);
+        TempleGuild.getInstance().getClanManager().clearPlayerClanCache(playerUUID); // Add this
         savePlayers();
         // Also update the Clan object in memory
         if (clanName != null) {

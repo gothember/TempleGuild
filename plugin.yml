@@ -4,6 +4,7 @@ main: ru.templeguild.TempleGuild
 api-version: 1.16
 author: YourName # Or Jules
 description: A clan plugin for Paper 1.16.5+
+softdepend: [PlaceholderAPI]
 commands:
   clan:
     description: Main command for clan management.

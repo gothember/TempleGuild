@@ -18,6 +18,7 @@ import java.util.List; // Added for List
 import java.util.ArrayList; // Added for ArrayList
 import java.util.Iterator; // Added for Iterator
 import java.util.HashSet; // Added for HashSet
+import java.util.concurrent.ConcurrentHashMap; // Added for ConcurrentHashMap
 
 public class ClanManager {
 
@@ -29,6 +30,7 @@ public class ClanManager {
     private final Set<UUID> clanChatToggled = new HashSet<>();
     // Store clan inventories in memory. Key: lowercase clan name
     private final Map<String, Inventory> clanInventories = new HashMap<>();
+    private final Map<UUID, String> playerClanCache = new ConcurrentHashMap<>();
 
     public ClanManager(TempleGuild plugin, DataStorage dataStorage) {
         this.plugin = plugin;
@@ -61,6 +63,10 @@ public class ClanManager {
                         plugin.getLogger().log(Level.SEVERE, "Could not deserialize_inventory for clan " + clan.getName(), e);
                     }
                 }
+                // Populate playerClanCache
+                for (UUID memberUUID : clan.getMembers()) {
+                    playerClanCache.put(memberUUID, clan.getName().toLowerCase());
+                }
             } else {
                 plugin.getLogger().warning("Failed to load clan data for: " + clanName);
             }
@@ -77,6 +83,7 @@ public class ClanManager {
         Clan clan = new Clan(name, leader);
         dataStorage.createClan(clan); // This also adds leader to player data via DataStorage
         clansMap.put(name.toLowerCase(), clan);
+        playerClanCache.put(leader, name.toLowerCase()); // Add leader to cache
         plugin.getLogger().info("Clan '" + name + "' created by " + leader.toString());
     }
 
@@ -85,11 +92,19 @@ public class ClanManager {
     }
 
     public Clan getClanByPlayer(UUID playerUUID) {
-        String clanName = dataStorage.getClanNameForPlayer(playerUUID);
-        if (clanName != null) {
-            return getClan(clanName);
+        String cachedClanNameLower = playerClanCache.get(playerUUID);
+        if (cachedClanNameLower != null) {
+            return clansMap.get(cachedClanNameLower); // clansMap stores by lowercase name
         }
         return null;
+    }
+
+    public boolean isPlayerInClanCached(UUID playerUUID) {
+        return playerClanCache.containsKey(playerUUID);
+    }
+
+    public void clearPlayerClanCache(UUID playerUUID) {
+        playerClanCache.remove(playerUUID);
     }
 
     public boolean isClanNameTaken(String name) {
@@ -105,9 +120,14 @@ public class ClanManager {
 
         // Remove all members from the clan in DataStorage first
         // This is handled by dataStorage.deleteClan() which calls removePlayerFromClan for all members
-        dataStorage.deleteClan(clanName);
-        clansMap.remove(clanName.toLowerCase());
-        clanInventories.remove(clanName.toLowerCase()); // Add this line
+        dataStorage.deleteClan(clanName); // This will trigger cache removal via DataStorage -> clearPlayerClanCache
+        Clan clanToRemove = clansMap.remove(clanName.toLowerCase());
+        if (clanToRemove != null) {
+            for (UUID memberUUID : clanToRemove.getMembers()) {
+                playerClanCache.remove(memberUUID); // Ensure all members are cleared from cache
+            }
+        }
+        clanInventories.remove(clanName.toLowerCase());
         plugin.getLogger().info("Clan '" + clanName + "' deleted.");
     }
 
@@ -214,8 +234,9 @@ public class ClanManager {
         }
 
         // Add player to clan
-        getDataStorage().addPlayerToClan(player.getUniqueId(), clan.getName());
+        dataStorage.addPlayerToClan(player.getUniqueId(), clan.getName());
         clan.addMember(player.getUniqueId()); // Update in-memory clan object
+        playerClanCache.put(player.getUniqueId(), clan.getName().toLowerCase()); // Update cache
 
         // Notify clan members (optional, can be noisy)
         String joinMessage = ChatUtils.format(plugin.getConfig().getString("messages.player_joined_clan", "&e{player_name} has joined the clan!")

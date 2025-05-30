@@ -16,6 +16,10 @@ messages:
 
   not_in_clan: "&cYou are not in a clan."
   player_not_online: "&cPlayer {player_name} is not online."
+
+  # Generic role/status messages
+  not_clan_leader: "&cOnly the clan leader can do that." # New generic message
+
   cannot_invite_self: "&cYou cannot invite yourself."
   invite_already_member: "&c{player_name} is already in your clan."
   invite_player_in_another_clan: "&c{player_name} is already in another clan."
@@ -53,3 +57,9 @@ messages:
 
 clan_storage:
   default_size: 27 # Must be multiple of 9, max 54. (e.g., 9, 18, 27, 36, 45, 54)
+
+placeholderapi:
+  no_clan_name: "No Clan"
+  pvp_status_no_clan: "N/A" # Or "false" or ""
+  leader_name_unknown: "Unknown"
+  leader_name_no_clan: "No Clan"

@@ -176,13 +176,13 @@ public class SqliteStorage implements DataStorage {
     @Override
     public void addPlayerToClan(UUID playerUUID, String clanName) {
         // Use REPLACE to handle both insert and update (if player was in another clan)
-        String sql = "REPLACE INTO players(player_uuid, clan_name) VALUES(?, (SELECT clan_name FROM clans WHERE original_name = ?))";
+        String sql = "REPLACE INTO players(player_uuid, clan_name) VALUES(?,?)"; // Simpler query
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, playerUUID.toString());
-            pstmt.setString(2, clanName);
+            pstmt.setString(2, clanName.toLowerCase()); // Store lowercase clan name
             pstmt.executeUpdate();
              // Update in-memory clan object
-            Clan clan = TempleGuild.getInstance().getClanManager().getClan(clanName);
+            Clan clan = TempleGuild.getInstance().getClanManager().getClan(clanName); // getClan uses original case
             if (clan != null) {
                 clan.addMember(playerUUID);
             }
@@ -199,7 +199,8 @@ public class SqliteStorage implements DataStorage {
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, playerUUID.toString());
             pstmt.executeUpdate();
-                TempleGuild.getInstance().getClanManager().removeFromClanChatToggleOnLeave(playerUUID); // Add this
+                TempleGuild.getInstance().getClanManager().removeFromClanChatToggleOnLeave(playerUUID);
+                TempleGuild.getInstance().getClanManager().clearPlayerClanCache(playerUUID); // Add this
 
             if (clanName != null) {
                  Clan clan = TempleGuild.getInstance().getClanManager().getClan(clanName);
@@ -235,16 +236,15 @@ public class SqliteStorage implements DataStorage {
     @Override
     public Set<UUID> getClanMembers(String clanName) {
         Set<UUID> members = new HashSet<>();
-        // We query based on the lowercase clan_name which is the PK in 'clans' and FK in 'players'
-        String sql = "SELECT player_uuid FROM players WHERE clan_name = (SELECT clan_name FROM clans WHERE original_name = ?)";
+        String sql = "SELECT player_uuid FROM players WHERE clan_name = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
-            pstmt.setString(1, clanName); // Use original name to find the lowercase key
+            pstmt.setString(1, clanName.toLowerCase()); // Query with lowercase name
             ResultSet rs = pstmt.executeQuery();
             while (rs.next()) {
                 try {
                     members.add(UUID.fromString(rs.getString("player_uuid")));
                 } catch (IllegalArgumentException e) {
-                     plugin.getLogger().warning("Invalid UUID format in database for clan " + clanName + ": " + rs.getString("player_uuid"));
+                     plugin.getLogger().warning("Invalid UUID format in database for clan " + clanName + ": " + rs.getString("player_uuid")); // Log with original name
                 }
             }
         } catch (SQLException e) {
