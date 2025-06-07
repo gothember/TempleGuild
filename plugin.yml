@@ -38,4 +38,10 @@ permissions:
   templeguild.clan.kick:
     description: Allows a clan leader (or authorized role) to kick a member.
     default: op # Or just 'op' if only leaders via logic for now
+  templeguild.clan.disband:
+    description: Allows a clan leader to disband their clan.
+    default: op
+  templeguild.clan.top:
+    description: Allows viewing the top clans by kills.
+    default: true
   # Add more permissions as commands are implemented

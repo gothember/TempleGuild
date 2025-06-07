@@ -235,6 +235,65 @@ public class ClanCommand implements CommandExecutor, TabCompleter {
             clanManager.kickPlayerFromClan(player, targetToKick, clan);
 
             return true;
+        } else if (subCommand.equals("disband")) {
+            if (!player.hasPermission("templeguild.clan.disband")) {
+                ChatUtils.sendMessages(player, plugin, "messages.no_permission");
+                return true;
+            }
+
+            Clan clan = clanManager.getClanByPlayer(player.getUniqueId());
+            if (clan == null) {
+                ChatUtils.sendMessages(player, plugin, "messages.not_in_clan");
+                return true;
+            }
+
+            // Only the leader can disband the clan
+            if (!clan.getLeader().equals(player.getUniqueId())) {
+                ChatUtils.sendMessages(player, plugin, "messages.clan_disband_not_leader");
+                return true;
+            }
+
+            clanManager.disbandClan(clan.getName(), player);
+            return true;
+        } else if (subCommand.equals("top")) {
+            if (!player.hasPermission("templeguild.clan.top")) {
+                ChatUtils.sendMessages(player, plugin, "messages.no_permission");
+                return true;
+            }
+
+            int topLimit = plugin.getConfig().getInt("clan_settings.kill_tracking.top_list_limit", 10);
+            if (topLimit <= 0) topLimit = 10;
+
+            Map<String, Integer> topClans = clanManager.getTopClans(topLimit);
+
+            if (topClans == null || topClans.isEmpty()) {
+                ChatUtils.sendMessages(player, plugin, "messages.clan_top_no_clans");
+                return true;
+            }
+
+            ChatUtils.sendMessages(player, plugin, "messages.clan_top_header");
+
+            int rank = 1;
+            String entryFormat = ChatUtils.getFormattedString(plugin, "messages.clan_top_entry_format");
+            // Basic check for common placeholders to ensure format is somewhat valid
+            if (entryFormat.isEmpty() || !entryFormat.contains("{rank}") || !entryFormat.contains("{clan_name}") || !entryFormat.contains("{kills}")) {
+                entryFormat = "&e#{rank}. &b{clan_name} &7- &f{kills} Kills";
+                plugin.getLogger().warning("messages.clan_top_entry_format is missing or malformed in config.yml. Using internal default.");
+            }
+
+            for (Map.Entry<String, Integer> entry : topClans.entrySet()) {
+                String clanName = entry.getKey();
+                int kills = entry.getValue();
+                String formattedEntry = entryFormat
+                        .replace("{rank}", String.valueOf(rank))
+                        .replace("{clan_name}", clanName)
+                        .replace("{kills}", String.valueOf(kills));
+                player.sendMessage(ChatUtils.format(formattedEntry));
+                rank++;
+            }
+
+            ChatUtils.sendMessages(player, plugin, "messages.clan_top_footer");
+            return true;
         }
 
         ChatUtils.sendMessages(player, plugin, "messages.unknown_subcommand", "{command}", subCommand);
@@ -279,7 +338,7 @@ public class ClanCommand implements CommandExecutor, TabCompleter {
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            List<String> subcommands = Arrays.asList("create", "invite", "accept", "decline", "chat", "pvp", "storage", "help", "leave", "kick" /*, disband, etc. */);
+            List<String> subcommands = Arrays.asList("create", "invite", "accept", "decline", "chat", "pvp", "storage", "help", "leave", "kick", "disband", "top");
             return subcommands.stream()
                     .filter(s -> s.startsWith(args[0].toLowerCase()))
                     .collect(Collectors.toList());

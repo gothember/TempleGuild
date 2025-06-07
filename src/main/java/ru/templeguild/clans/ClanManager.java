@@ -311,14 +311,30 @@ public class ClanManager {
 
     // ... other clan management methods as needed (e.g., promotions, alliances etc.)
 
+    private int getMaxMembers() {
+        int max = plugin.getConfig().getInt("clan_settings.max_members", 10);
+        if (max < 0) {
+            plugin.getLogger().warning(ChatUtils.getFormattedString(plugin, "messages.max_members_config_invalid"));
+            return 0;
+        }
+        return max;
+    }
+
     public void sendInvite(Clan clan, Player inviter, Player invitedPlayer) {
+        // Existing checks
         if (clan.isMember(invitedPlayer.getUniqueId())) {
             ChatUtils.sendMessages(inviter, plugin, "messages.invite_already_member", "{player_name}", invitedPlayer.getName());
             return;
         }
-
         if (getClanByPlayer(invitedPlayer.getUniqueId()) != null) {
             ChatUtils.sendMessages(inviter, plugin, "messages.invite_player_in_another_clan", "{player_name}", invitedPlayer.getName());
+            return;
+        }
+
+        // New check: Max members
+        int maxMembers = getMaxMembers();
+        if (maxMembers > 0 && clan.getMembers().size() >= maxMembers) {
+            ChatUtils.sendMessages(inviter, plugin, "messages.clan_is_full_on_invite", "{clan_name}", clan.getName());
             return;
         }
 
@@ -403,22 +419,32 @@ public class ClanManager {
             return false;
         }
 
-        Clan clan = getClan(acceptedInvite.getClanName());
-        if (clan == null) {
+        Clan clanToJoin = getClan(acceptedInvite.getClanName());
+        if (clanToJoin == null) {
             ChatUtils.sendMessages(player, plugin, "messages.clan_disbanded_on_accept", "{clan_name}", acceptedInvite.getClanName());
             invites.remove(acceptedInvite);
+            if (invites.isEmpty()) pendingInvites.remove(player.getUniqueId());
             return false;
         }
 
-        if (getClanByPlayer(player.getUniqueId()) != null) {
+        if (getClanByPlayer(player.getUniqueId()) != null) { // Check if player joined another clan while invite was pending
             ChatUtils.sendMessages(player, plugin, "messages.already_in_clan_on_accept");
             invites.remove(acceptedInvite);
+            if (invites.isEmpty()) pendingInvites.remove(player.getUniqueId());
             return false;
         }
 
-        dataStorage.addPlayerToClan(player.getUniqueId(), clan.getName());
-        clan.addMember(player.getUniqueId());
-        playerClanCache.put(player.getUniqueId(), clan.getName().toLowerCase());
+        int maxMembers = getMaxMembers();
+        if (maxMembers > 0 && clanToJoin.getMembers().size() >= maxMembers) {
+            ChatUtils.sendMessages(player, plugin, "messages.clan_is_full_on_accept", "{clan_name}", clanToJoin.getName());
+            invites.remove(acceptedInvite);
+            if (invites.isEmpty()) pendingInvites.remove(player.getUniqueId());
+            return false;
+        }
+
+        dataStorage.addPlayerToClan(player.getUniqueId(), clanToJoin.getName());
+        clanToJoin.addMember(player.getUniqueId());
+        playerClanCache.put(player.getUniqueId(), clanToJoin.getName().toLowerCase());
 
         String joinMessage = ChatUtils.getFormattedString(plugin, "messages.player_joined_clan", "{player_name}", player.getName());
         clan.getMembers().stream()
@@ -661,5 +687,17 @@ public class ClanManager {
             }
         }
         plugin.getLogger().info(plugin.getConfig().getString("messages.log_inventories_saving_complete", "Clan inventories saving complete."));
+    }
+
+    public void incrementClanKills(String clanName, int amount) {
+        Clan clan = getClan(clanName);
+        if (clan != null) {
+            clan.incrementKills(amount);
+            dataStorage.updateClanKills(clan.getName(), clan.getKills());
+        }
+    }
+
+    public Map<String, Integer> getTopClans(int limit) {
+        return dataStorage.getTopClansByKills(limit);
     }
 }

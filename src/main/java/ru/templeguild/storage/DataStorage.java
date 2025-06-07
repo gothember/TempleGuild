@@ -20,4 +20,7 @@ public interface DataStorage {
     String getClanNameForPlayer(UUID playerUUID);
     boolean isPlayerInClan(UUID playerUUID);
     Set<UUID> getClanMembers(String clanName);
+
+    void updateClanKills(String clanName, int kills);
+    java.util.Map<String, Integer> getTopClansByKills(int limit); // Use java.util.Map
 }

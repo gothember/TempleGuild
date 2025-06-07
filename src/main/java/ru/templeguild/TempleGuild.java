@@ -56,9 +56,10 @@ public final class TempleGuild extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new ru.templeguild.listeners.PlayerChatListener(this), this);
         getServer().getPluginManager().registerEvents(new ru.templeguild.listeners.PlayerDamageListener(this), this);
         getServer().getPluginManager().registerEvents(new ru.templeguild.listeners.PlayerInventoryCloseListener(this), this);
+        getServer().getPluginManager().registerEvents(new ru.templeguild.listeners.PlayerDeathListener(this), this); // Add this line
 
         // Hook into PlaceholderAPI
-        if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) { // Changed from Bukkit.getPluginManager()
+        if (getServer().getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new ru.templeguild.integrations.TempleGuildExpansion(this).register();
             getLogger().info(getConfig().getString("messages.papi_hook_success", "Successfully hooked into PlaceholderAPI and registered placeholders."));
         } else {

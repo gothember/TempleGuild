@@ -53,6 +53,20 @@ public class Clan {
         this.serializedStorage = serializedStorage;
     }
 
+    private int kills = 0;
+
+    public int getKills() {
+        return kills;
+    }
+
+    public void setKills(int kills) {
+        this.kills = kills;
+    }
+
+    public void incrementKills(int amount) {
+        this.kills += amount;
+    }
+
     // equals and hashCode based on clan name for uniqueness
     @Override
     public boolean equals(Object o) {

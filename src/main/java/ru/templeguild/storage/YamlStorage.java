@@ -14,6 +14,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.logging.Level;
+import java.util.Map; // Added
+import java.util.HashMap; // Added
+import java.util.LinkedHashMap; // Added
 
 public class YamlStorage implements DataStorage {
 
@@ -74,10 +77,10 @@ public class YamlStorage implements DataStorage {
         clanSection.set("name", clan.getName());
         clanSection.set("leader", clan.getLeader().toString());
         clanSection.set("pvpEnabled", clan.isPvpEnabled());
-        if (clan.getSerializedStorage() != null) { // Should be null on creation
+        clanSection.set("kills", clan.getKills()); // Should be 0 initially
+        if (clan.getSerializedStorage() != null) {
             clanSection.set("storage", clan.getSerializedStorage());
         }
-        // Members are implicitly managed via players.yml for YAML to simplify,
         // but could be stored here as a list too. For now, we'll derive members from players.yml.
         saveClans();
         // Add leader to player data
@@ -97,10 +100,10 @@ public class YamlStorage implements DataStorage {
 
         Clan clan = new Clan(name, leader);
         clan.setPvpEnabled(pvpEnabled);
-        clan.setSerializedStorage(clanSection.getString("storage")); // Can be null
+        clan.setSerializedStorage(clanSection.getString("storage"));
+        clan.setKills(clanSection.getInt("kills", 0));
 
-        // Load members from players.yml
-        getClanMembers(name).forEach(clan::addMember); // Ensure members are loaded into the clan object
+        getClanMembers(name).forEach(clan::addMember);
         return clan;
     }
 
@@ -111,10 +114,11 @@ public class YamlStorage implements DataStorage {
         if (clanSection == null) {
             clanSection = clansConfig.createSection("clans." + clanNameLower);
         }
-        clanSection.set("name", clan.getName()); // In case of case change, though name is key
+        clanSection.set("name", clan.getName());
         clanSection.set("leader", clan.getLeader().toString());
         clanSection.set("pvpEnabled", clan.isPvpEnabled());
-        clanSection.set("storage", clan.getSerializedStorage()); // Store it, can be null
+        clanSection.set("kills", clan.getKills()); // Ensure kills are saved
+        clanSection.set("storage", clan.getSerializedStorage());
         saveClans();
     }
 
@@ -192,5 +196,33 @@ public class YamlStorage implements DataStorage {
             }
         }
         return members;
+    }
+
+    @Override
+    public void updateClanKills(String clanName, int kills) {
+        String clanNameLower = clanName.toLowerCase();
+        if (clansConfig.isConfigurationSection("clans." + clanNameLower)) {
+            clansConfig.set("clans." + clanNameLower + ".kills", kills);
+            saveClans();
+        } else {
+            plugin.getLogger().warning("Attempted to update kills for non-existent clan (YAML): " + clanName);
+        }
+    }
+
+    @Override
+    public Map<String, Integer> getTopClansByKills(int limit) {
+        Map<String, Integer> clanKills = new HashMap<>();
+        if (clansConfig.isConfigurationSection("clans")) {
+            for (String key : clansConfig.getConfigurationSection("clans").getKeys(false)) {
+                String originalName = clansConfig.getString("clans." + key + ".name", key);
+                int kills = clansConfig.getInt("clans." + key + ".kills", 0);
+                clanKills.put(originalName, kills);
+            }
+        }
+
+        return clanKills.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(limit)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
     }
 }

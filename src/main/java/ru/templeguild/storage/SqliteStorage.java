@@ -10,6 +10,8 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
+import java.util.Map; // Added for getTopClansByKills
+import java.util.LinkedHashMap; // Added for getTopClansByKills
 
 public class SqliteStorage implements DataStorage {
 
@@ -63,8 +65,9 @@ public class SqliteStorage implements DataStorage {
                     "clan_name TEXT PRIMARY KEY COLLATE NOCASE, " +
                     "original_name TEXT NOT NULL, " + // To store original casing
                     "leader_uuid TEXT NOT NULL, " +
-                        "pvp_enabled BOOLEAN NOT NULL DEFAULT 0, " +
-                        "storage_data TEXT NULL)");
+                    "pvp_enabled BOOLEAN NOT NULL DEFAULT 0, " +
+                    "storage_data TEXT NULL, " +
+                    "kills INTEGER DEFAULT 0)");
 
             // Players table: player_uuid is primary key
             statement.execute("CREATE TABLE IF NOT EXISTS players (" +
@@ -93,15 +96,15 @@ public class SqliteStorage implements DataStorage {
 
     @Override
     public void createClan(Clan clan) {
-        String sql = "INSERT INTO clans(clan_name, original_name, leader_uuid, pvp_enabled, storage_data) VALUES(?,?,?,?,?)";
+        String sql = "INSERT INTO clans(clan_name, original_name, leader_uuid, pvp_enabled, storage_data, kills) VALUES(?,?,?,?,?,?)";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, clan.getName().toLowerCase());
             pstmt.setString(2, clan.getName());
             pstmt.setString(3, clan.getLeader().toString());
             pstmt.setBoolean(4, clan.isPvpEnabled());
-            pstmt.setString(5, clan.getSerializedStorage()); // Can be null
+            pstmt.setString(5, clan.getSerializedStorage());
+            pstmt.setInt(6, clan.getKills()); // Should be 0
             pstmt.executeUpdate();
-            // Add leader to player data
             addPlayerToClan(clan.getLeader(), clan.getName());
         } catch (SQLException e) {
             plugin.getLogger().log(Level.SEVERE, "Could not create clan: " + clan.getName(), e);
@@ -110,7 +113,7 @@ public class SqliteStorage implements DataStorage {
 
     @Override
     public Clan getClan(String clanName) {
-        String sql = "SELECT original_name, leader_uuid, pvp_enabled, storage_data FROM clans WHERE clan_name = ?";
+        String sql = "SELECT original_name, leader_uuid, pvp_enabled, storage_data, kills FROM clans WHERE clan_name = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, clanName.toLowerCase());
             ResultSet rs = pstmt.executeQuery();
@@ -120,8 +123,8 @@ public class SqliteStorage implements DataStorage {
                 boolean pvpEnabled = rs.getBoolean("pvp_enabled");
                 Clan clan = new Clan(originalName, leader);
                 clan.setPvpEnabled(pvpEnabled);
-                clan.setSerializedStorage(rs.getString("storage_data")); // Can be null
-                // Load members into the clan object
+                clan.setSerializedStorage(rs.getString("storage_data"));
+                clan.setKills(rs.getInt("kills"));
                 getClanMembers(originalName).forEach(clan::addMember);
                 return clan;
             }
@@ -133,13 +136,14 @@ public class SqliteStorage implements DataStorage {
 
     @Override
     public void updateClan(Clan clan) {
-        String sql = "UPDATE clans SET original_name = ?, leader_uuid = ?, pvp_enabled = ?, storage_data = ? WHERE clan_name = ?";
+        String sql = "UPDATE clans SET original_name = ?, leader_uuid = ?, pvp_enabled = ?, storage_data = ?, kills = ? WHERE clan_name = ?";
         try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
             pstmt.setString(1, clan.getName());
             pstmt.setString(2, clan.getLeader().toString());
             pstmt.setBoolean(3, clan.isPvpEnabled());
             pstmt.setString(4, clan.getSerializedStorage());
-            pstmt.setString(5, clan.getName().toLowerCase());
+            pstmt.setInt(5, clan.getKills());
+            pstmt.setString(6, clan.getName().toLowerCase());
             pstmt.executeUpdate();
         } catch (SQLException e) {
             plugin.getLogger().log(Level.SEVERE, "Could not update clan: " + clan.getName(), e);
@@ -259,5 +263,33 @@ public class SqliteStorage implements DataStorage {
             plugin.getLogger().log(Level.SEVERE, "Could not retrieve members for clan: " + clanName, e);
         }
         return members;
+    }
+
+    @Override
+    public void updateClanKills(String clanName, int kills) {
+        String sql = "UPDATE clans SET kills = ? WHERE clan_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, kills);
+            pstmt.setString(2, clanName.toLowerCase());
+            pstmt.executeUpdate();
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Could not update kills for clan: " + clanName, e);
+        }
+    }
+
+    @Override
+    public Map<String, Integer> getTopClansByKills(int limit) {
+        Map<String, Integer> topClans = new LinkedHashMap<>(); // Preserve order
+        String sql = "SELECT original_name, kills FROM clans ORDER BY kills DESC LIMIT ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setInt(1, limit);
+            ResultSet rs = pstmt.executeQuery();
+            while (rs.next()) {
+                topClans.put(rs.getString("original_name"), rs.getInt("kills"));
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Could not retrieve top clans by kills", e);
+        }
+        return topClans;
     }
 }

@@ -4,7 +4,6 @@ storage_type: yaml # or sqlite
 messages:
   players_only: ["&cOnly players can use this command."]
   no_permission: ["&cYou don't have permission to do that."]
-  # clan_help: ["&eUsage: /clan <subcommand>"] # Basic placeholder - Will be replaced by new help system
   unknown_subcommand: ["&cUnknown subcommand. Use /clan help."]
 
   clan_create_usage: ["&cUsage: /clan create <name>"]
@@ -102,6 +101,29 @@ messages:
   clan_kick_notification_members:
     - "&e{target_player_name} has been kicked from the clan by {kicker_name}."
 
+  clan_disband_not_leader:
+    - "&cOnly the leader of the clan can disband it."
+
+  # Max Member Messages
+  clan_is_full_on_invite:
+    - "&cClan {clan_name} is already full. Cannot invite more players."
+  clan_is_full_on_accept:
+    - "&cCannot join clan {clan_name} as it is currently full."
+  max_members_config_invalid: # For console warning
+    - "Invalid value for clan_settings.max_members in config.yml. Must be a non-negative integer. Defaulting to 0 (unlimited)."
+  clan_kill_awarded: # Sent to killer if their kill is counted for their clan
+    - "&aYour kill of {victim_name} has been recorded for clan {clan_name}!"
+
+  # Clan Top Messages
+  clan_top_header:
+    - "&e--- Top Clans by Kills ---"
+  clan_top_entry_format: # Single string format for each clan entry
+    - "&6#{rank}. &b{clan_name} &f- &e{kills} &7Kills"
+  clan_top_footer:
+    - "&e-------------------------"
+  clan_top_no_clans:
+    - "&cThere are no clans with kills recorded yet, or no clans exist."
+
   # Help System Messages
   clan_help_header: ["&e--- TempleGuild Clan Help ---"]
   clan_help_footer: ["&e--- Type /clan help <command> for more info ---"]
@@ -143,17 +165,25 @@ messages:
       arguments: "[command]"
       description: "Shows this help message or help for a specific command."
       permission: ""
-      leave: # New entry
-        arguments: "" # No arguments
+      leave:
+        arguments: ""
         description: "Leave your current clan."
         permission: "templeguild.clan.leave"
-      kick: # New entry
+      kick:
         arguments: "<player>"
         description: "Kicks a player from your clan (leader only)."
         permission: "templeguild.clan.kick"
+      disband: # New entry
+        arguments: "" # No arguments
+        description: "Disbands your clan (leader only)."
+        permission: "templeguild.clan.disband"
+      top: # New entry
+        arguments: "" # No arguments
+        description: "Shows the top clans by kills."
+        permission: "templeguild.clan.top"
 
 
-# Console / System Messages (already converted to lists)
+# Console / System Messages
 plugin_enabled: ["TempleGuild plugin enabled!"]
 plugin_disabled: ["TempleGuild plugin disabled!"]
 
@@ -177,6 +207,7 @@ expired_invites_cleaned: ["Cleaned up expired clan invitations."]
 log_saving_all_inventories: ["Saving all loaded clan inventories..."]
 log_inventories_saving_complete: ["Clan inventories saving complete."]
 
+# Clan Storage Settings
 clan_storage:
   default_size: 27 # Must be multiple of 9, max 54. (e.g., 9, 18, 27, 36, 45, 54)
   fill_new_storage_with_filler_item: false # Set to true to enable
@@ -187,8 +218,17 @@ clan_storage:
       - "&7This slot is decorative."
       # - "&7More lore lines if needed."
 
+# PlaceholderAPI Defaults
 placeholderapi:
   no_clan_name: ["No Clan"]
   pvp_status_no_clan: ["N/A"]
   leader_name_unknown: ["Unknown"]
   leader_name_no_clan: ["No Clan"]
+
+# General Clan Settings
+clan_settings:
+  max_members: 10 # Default maximum members per clan. Set to 0 for unlimited.
+  kill_tracking:
+    count_friendly_fire: false # Set to true if kills against own clan members should count towards clan top
+    show_kill_message_to_killer: true # Set to false to disable message to killer when their kill is counted
+    top_list_limit: 10 # Number of clans to show in /clan top
