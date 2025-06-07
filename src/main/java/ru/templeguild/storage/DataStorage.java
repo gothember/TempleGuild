@@ -23,4 +23,6 @@ public interface DataStorage {
 
     void updateClanKills(String clanName, int kills);
     java.util.Map<String, Integer> getTopClansByKills(int limit); // Use java.util.Map
+
+    void removeAllPlayersFromClanAndClearCaches(String clanName, java.util.Set<java.util.UUID> memberUUIDs);
 }

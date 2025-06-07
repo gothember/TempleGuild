@@ -225,4 +225,32 @@ public class YamlStorage implements DataStorage {
                 .limit(limit)
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (e1, e2) -> e1, LinkedHashMap::new));
     }
+
+    @Override
+    public void removeAllPlayersFromClanAndClearCaches(String clanName, Set<UUID> memberUUIDs) {
+        if (memberUUIDs == null || memberUUIDs.isEmpty()) {
+            return;
+        }
+
+        boolean modified = false;
+        if (playersConfig.isConfigurationSection("players")) {
+            for (String uuidString : playersConfig.getConfigurationSection("players").getKeys(false)) {
+                // Check if this player's clan is the one being disbanded
+                if (clanName.equalsIgnoreCase(playersConfig.getString("players." + uuidString + ".clan"))) {
+                    playersConfig.set("players." + uuidString + ".clan", null);
+                    modified = true;
+                }
+            }
+        }
+
+        if (modified) {
+            savePlayers();
+        }
+
+        for (UUID memberUUID : memberUUIDs) {
+            plugin.getClanManager().clearPlayerClanCache(memberUUID);
+            plugin.getClanManager().removeFromClanChatToggleOnLeave(memberUUID);
+        }
+        plugin.getLogger().info("Processed mass player removal from clan " + clanName + " in YAML storage and cleared caches for " + memberUUIDs.size() + " members.");
+    }
 }

@@ -292,4 +292,32 @@ public class SqliteStorage implements DataStorage {
         }
         return topClans;
     }
+
+    @Override
+    public void removeAllPlayersFromClanAndClearCaches(String clanName, Set<UUID> memberUUIDs) {
+        if (memberUUIDs == null || memberUUIDs.isEmpty()) {
+            // Even if memberUUIDs is empty (e.g. clan had 0 members but somehow existed),
+            // we might still want to run the SQL UPDATE to ensure DB consistency if any stragglers.
+            // However, the cache clearing loop below would do nothing.
+            // If memberUUIDs is the source of truth for who *was* in the clan for cache clearing, then it's fine.
+        }
+
+        String sql = "UPDATE players SET clan_name = NULL WHERE clan_name = ?";
+        try (PreparedStatement pstmt = connection.prepareStatement(sql)) {
+            pstmt.setString(1, clanName.toLowerCase());
+            int affectedRows = pstmt.executeUpdate();
+            plugin.getLogger().info("Disassociated " + affectedRows + " players from clan " + clanName + " in SQLite database.");
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Could not disassociate players from clan: " + clanName + " in SQLite", e);
+        }
+
+        // Clear caches for all members that were in the clan, using the provided list
+        if (memberUUIDs != null) { // Check again in case it was initially null but we decided to run SQL anyway
+            for (UUID memberUUID : memberUUIDs) {
+                plugin.getClanManager().clearPlayerClanCache(memberUUID);
+                plugin.getClanManager().removeFromClanChatToggleOnLeave(memberUUID);
+            }
+            plugin.getLogger().info("Cleared caches for " + memberUUIDs.size() + " former members of clan " + clanName + " after mass removal.");
+        }
+    }
 }

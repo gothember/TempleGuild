@@ -210,28 +210,38 @@ public class ClanManager {
 
         plugin.getLogger().info("Disbanding clan: " + clan.getName() + (initiator != null ? " by " + initiator.getName() : ""));
 
-        List<UUID> membersToNotify = new ArrayList<>(clan.getMembers());
+        Set<UUID> memberUUIDs = new HashSet<>(clan.getMembers()); // Get member UUIDs before they are removed
+
+        // Notify all members before they are removed
         String disbandedMessage = ChatUtils.getFormattedString(plugin, "messages.clan_disbanded_notification_members", "{clan_name}", clan.getName());
-        for (UUID memberUUID : membersToNotify) {
+        for (UUID memberUUID : memberUUIDs) { // Iterate over the copied set
             Player memberPlayer = Bukkit.getPlayer(memberUUID);
             if (memberPlayer != null && memberPlayer.isOnline()) {
                 memberPlayer.sendMessage(disbandedMessage);
             }
         }
 
-        for (UUID memberUUID : new ArrayList<>(clan.getMembers())) {
-            removePlayerFromClanInternal(memberUUID, clan);
-        }
+        // Efficiently remove all players from clan in DataStorage and clear their caches
+        dataStorage.removeAllPlayersFromClanAndClearCaches(clan.getName(), memberUUIDs);
 
+        // Clear the clan's member list in the in-memory Clan object
+        // Note: This assumes Clan.getMembers() returns a mutable set or provides a clearMembers() method.
+        // If Clan.getMembers() returns an immutable copy, this line might not be strictly necessary if the clan object is about to be discarded.
+        // However, for consistency if the clan object were to be inspected further before being GC'd:
+        clan.getMembers().clear(); // Or clan.setMembers(new HashSet<>()); if a setter is available/preferred
+
+        // Delete clan storage (inventory)
         if (clanInventories.containsKey(clan.getName().toLowerCase())) {
             clan.setSerializedStorage(null);
             clanInventories.remove(clan.getName().toLowerCase());
             plugin.getLogger().info("Removed in-memory storage for disbanded clan: " + clan.getName());
         }
 
+        // Delete clan from DataStorage (the actual clan record)
         dataStorage.deleteClan(clan.getName());
-        clansMap.remove(clan.getName().toLowerCase());
 
+        // Delete from memory map
+        clansMap.remove(clan.getName().toLowerCase());
 
         if (initiator != null) {
             ChatUtils.sendMessages(initiator, plugin, "messages.clan_disband_success", "{clan_name}", clan.getName());
