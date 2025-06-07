@@ -447,12 +447,12 @@ public class ClanManager {
         playerClanCache.put(player.getUniqueId(), clanToJoin.getName().toLowerCase());
 
         String joinMessage = ChatUtils.getFormattedString(plugin, "messages.player_joined_clan", "{player_name}", player.getName());
-        clan.getMembers().stream()
+        clanToJoin.getMembers().stream() // CORRECTED: Was 'clan'
             .map(Bukkit::getPlayer)
             .filter(java.util.Objects::nonNull)
             .forEach(member -> member.sendMessage(joinMessage)); // Already formatted
 
-        ChatUtils.sendMessages(player, plugin, "messages.invite_accepted", "{clan_name}", clan.getName());
+        ChatUtils.sendMessages(player, plugin, "messages.invite_accepted", "{clan_name}", clanToJoin.getName()); // CORRECTED: Was 'clan'
 
         invites.remove(acceptedInvite);
         if (invites.isEmpty()) {
